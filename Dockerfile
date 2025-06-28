@@ -4,9 +4,9 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install
+RUN npm install -g pnpm ts-node && pnpm install
 
 COPY . .
 
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["pnpm", "run", "dev"]

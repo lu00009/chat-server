@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:20-alphine
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   app:
     build:
       context: .
@@ -17,6 +22,10 @@ services:
       - "3002:3000"
     environment:
       NODE_ENV: development
+      DATABASE_URL: postgresql://user:password@db:5432/mydb
+    depends_on:
+      db:
+        condition: service_healthy
     develop:
       watch:
         - action: sync
@@ -26,3 +35,5 @@ services:
             - node_modules/
         - action: rebuild
           path: package.json
+volumes:
+  db_data:
