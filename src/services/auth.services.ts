@@ -20,12 +20,17 @@ export const AuthService = {
   },
 
   async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, password: true }
+    });
     if (!user) throw new Error('Invalid credentials');
 
     const isValid = await comparePassword(password, user.password);
     if (!isValid) throw new Error('Invalid credentials');
 
-    return user;
+    // Don't return password in the response
+    const { password: _pw, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 };

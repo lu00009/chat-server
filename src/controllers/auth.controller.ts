@@ -5,9 +5,9 @@ import { generateToken } from '../utils/auth.utils';
 export const AuthController = {
   async register(req: Request, res: Response) {
     try {
+      console.log('Register request body:', req.body);
       const user = await AuthService.register(req.body.email, req.body.password, req.body.name);
-      const token = generateToken(user.id);
-      res.status(201).json({ user, token });
+      res.status(201).json({ message: 'User registered successfully', user });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -15,8 +15,9 @@ export const AuthController = {
 
   async login(req: Request, res: Response) {
     try {
+      console.log('Login request body:', req.body);
       const user = await AuthService.login(req.body.email, req.body.password);
-      const token = generateToken(user.id);
+      const token = generateToken(Number(user.id));
       res.json({ user, token });
     } catch (error: any) {
       res.status(401).json({ error: error.message });
