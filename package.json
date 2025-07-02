@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.ts",
-    "build": "tsc && npm run copy-prisma",
+    "build": "npx prisma generate && npx prisma migrate deploy && tsc",
     "copy-prisma": "cp -r src/generated dist/generated",
     "start": "node dist/index.js",
     "prisma:generate": "npx prisma generate",
