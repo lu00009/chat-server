@@ -17,7 +17,7 @@ export const AuthController = {
     try {
       console.log('Login request body:', req.body);
       const user = await AuthService.login(req.body.email, req.body.password);
-      const token = generateToken(Number(user.id));
+      const token = generateToken(String(user.id)); // Convert user.id to string
       res.json({ user, token });
     } catch (error: any) {
       res.status(401).json({ error: error.message });

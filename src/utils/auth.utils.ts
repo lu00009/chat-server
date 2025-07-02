@@ -9,5 +9,5 @@ export const hashPassword = (password: string) => bcrypt.hash(password, SALT_ROU
 export const comparePassword = (plainText: string, hash: string) => bcrypt.compare(plainText, hash);
 
 // JWT
-export const generateToken = (userId: number) => jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '1d' });
-export const verifyToken = (token: string) => jwt.verify(token, env.JWT_SECRET) as { userId: number };
+export const generateToken = (userId: string) => jwt.sign({ userId }, env.JWT_SECRET, { expiresIn: '1d' }); // Changed userId to string
+export const verifyToken = (token: string) => jwt.verify(token, env.JWT_SECRET) as { userId: string }; // Changed userId to string
