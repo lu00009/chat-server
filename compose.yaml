@@ -21,7 +21,7 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://user:password@db:5432/mydb
-      JWT_SECRET: de4fa900f93d4bda35e3262413f403c9 # <-- Ensure this matches your .env
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       db:
         condition: service_healthy
