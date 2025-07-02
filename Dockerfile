@@ -1,5 +1,9 @@
 FROM node:20-alpine AS builder
 
+# Add these two lines for the builder stage
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
@@ -14,6 +18,10 @@ RUN pnpm run build
 RUN cp -r src/generated dist/generated
 
 FROM node:20-alpine
+
+# Add these two lines for the final stage
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
 
 WORKDIR /app
 
