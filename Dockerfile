@@ -1,23 +1,30 @@
-# Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN npx prisma generate
+
+RUN pnpm run build
+RUN cp -r src/generated dist/generated
+
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package.json and lock file first to leverage Docker cache
-COPY package.json pnpm-lock.yaml ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/dist/generated /app/dist/generated
 
-# Install dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN npm install -g pnpm
 
-# Copy all application code (including src, prisma, etc.)
-COPY . .
-
-# Ensure Prisma Client is generated inside the container after copying schema
-# This step is CRUCIAL to ensure the client matches the schema copied into the image
-RUN npx prisma generate
-
-# Expose the port your app runs on
 EXPOSE 3000
 
-# Command to run your application in development
-CMD ["pnpm", "dev"]
+CMD ["sh", "-c", "npx prisma migrate deploy && pnpm start"]

@@ -14,18 +14,18 @@ export const authenticate = (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {  // Explicit void return type
+): void => {
   const token = req.header('Authorization')?.split(' ')[1];
-  
+
   if (!token) {
     res.status(401).json({ error: 'Authentication required' });
-    return;  // Explicit return
+    return;
   }
 
   try {
     const decoded = verifyToken(token);
-    req.userId = decoded.userId.toString();
-    next();  // Proper middleware chaining
+    req.userId = decoded.userId; // Removed .toString()
+    next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
   }
