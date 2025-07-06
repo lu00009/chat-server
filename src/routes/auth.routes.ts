@@ -8,7 +8,7 @@ const router = Router();
 router.post('/register', validatePassword, AuthController.register);
 router.post('/login', AuthController.login);
 router.get('/profile', authenticate, (req, res) => {
-  res.json({ userId: req.userId });
+  res.json({ userId: req.user?.id });
 });
 
 export default router;

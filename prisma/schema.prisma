@@ -7,7 +7,7 @@
 generator client {
   provider      = "prisma-client-js"
   output        = "../src/generated/prisma"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -22,6 +22,52 @@ model User {
   name      String?   // Or String if you made it required and handled it with ?? ''
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  groupMemberships GroupMember[]
+  createdGroups Group[] @relation("UserCreatedGroups")
 }
 
 
+model Group {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  isPrivate   Boolean       @default(false)
+  createdBy   String
+  creator     User          @relation("UserCreatedGroups", fields: [createdBy], references: [id])
+  members     GroupMember[]
+  topics      Topic[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+}
+
+model GroupMember {
+  id         String   @id @default(uuid())
+  userId     String
+  groupId    String
+  role       Role     @default(MEMBER)
+  permissions Json    @default("{}") // e.g., { "sendMessage": true, ... }
+  joinedAt   DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <--- ADD THIS if you want topics to be deleted
+
+
+  @@unique([userId, groupId])
+}
+
+model Topic {
+  id        String   @id @default(uuid())
+  title     String
+  groupId   String
+  createdBy String
+  createdAt DateTime @default(now())
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) 
+
+}
+
+enum Role {
+  CREATOR   // Full power, cannot be removed
+  ADMIN     // Full power (except delete group)
+  MEMBER    // Follows permissions
+}
