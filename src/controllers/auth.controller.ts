@@ -4,6 +4,7 @@ import { generateToken } from '../utils/auth.utils';
 
 export const AuthController = {
   async register(req: Request, res: Response) {
+    console.log('POST /auth/register route hit');
     try {
       console.log('Register request body:', req.body);
       const user = await AuthService.register(req.body.email, req.body.password, req.body.name);
@@ -14,6 +15,7 @@ export const AuthController = {
   },
 
   async login(req: Request, res: Response) {
+    console.log('POST /auth/login route hit');
     try {
       console.log('Login request body:', req.body);
       const user = await AuthService.login(req.body.email, req.body.password);
@@ -22,5 +24,10 @@ export const AuthController = {
     } catch (error: any) {
       res.status(401).json({ error: error.message });
     }
+  },
+
+  async profile(req: Request, res: Response) {
+    console.log('GET /auth/profile route hit');
+    // ... existing code ...
   }
 };
