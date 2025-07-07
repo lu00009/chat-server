@@ -1,4 +1,5 @@
-# compose.yaml
+version: '3.8'
+
 services:
   db:
     image: postgres:16-alpine
@@ -14,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./db:/var/lib/postgresql/data # This is correct for DB persistence
+      - postgres-data:/var/lib/postgresql/data
 
   app:
     build:
@@ -38,4 +39,6 @@ services:
             - node_modules/
         - action: rebuild
           path: package.json
-    
+
+volumes:
+  postgres-data:
