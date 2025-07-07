@@ -23,10 +23,8 @@ services:
     image: nextjs-dev
     ports:
       - "3002:3000"
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://user:password@db:5432/mydb
-      JWT_SECRET: ${JWT_SECRET}
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
