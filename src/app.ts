@@ -2,11 +2,18 @@ import cors from 'cors';
 import express from 'express';
 import authRoutes from './routes/auth.routes';
 import groupRoutes from './routes/group.routes';
+import "reflect-metadata";
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from "swagger-jsdoc";
+import { swaggerOptions } from "./swagger/swaggerOptions";
 
 const app = express();
 
 app.use(express.json());
 app.use(cors());
+
+const specs = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
 app.use('/auth', authRoutes);
 app.use('/group', groupRoutes);
