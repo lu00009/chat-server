@@ -5,7 +5,7 @@ import {
   promoteToAdmin,
   updatePermissions,
   getMembers,demoteToMember, deleteGroup, leaveGroup ,
-  createTopic, getTopics, updateTopic, deleteTopic
+  createTopic, getTopics, updateTopic, deleteTopic, getGroups, getGroupById, addMember
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { isCreator, hasPermission } from '../middlewares/group/permission';
@@ -300,5 +300,66 @@ router.put('/:groupId/topics/:topicId', hasPermission('manageTopics'), updateTop
  */
 
 router.delete('/:groupId/topics/:topicId', hasPermission('manageTopics'), deleteTopic);
+
+/**
+ * @swagger
+ * /group:
+ *   get:
+ *     summary: Get all groups
+ *     tags: [Groups]
+ *     responses:
+ *       200:
+ *         description: List of groups
+ */
+router.get('/', getGroups);
+
+/**
+ * @swagger
+ * /group/{groupId}:
+ *   get:
+ *     summary: Get a group by ID
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Group details
+ *       404:
+ *         description: Group not found
+ */
+router.get('/:groupId', getGroupById);
+
+/**
+ * @swagger
+ * /group/{groupId}/add-member:
+ *   post:
+ *     summary: Add a member to a group
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Member added
+ *       400:
+ *         description: User is already a member
+ */
+router.post('/:groupId/add-member', addMember);
 
 export default router;

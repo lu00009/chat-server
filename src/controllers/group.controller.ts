@@ -500,3 +500,74 @@ export const deleteTopic = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+// Get a group by ID
+export const getGroupById = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  try {
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true } },
+        topics: true,
+      },
+    });
+    if (!group) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+    res.json(group);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get group' });
+  }
+};
+
+// Get all groups
+export const getGroups = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const groups = await prisma.group.findMany({
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true } },
+        topics: true,
+      },
+    });
+    res.json(groups);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get groups' });
+  }
+};
+
+// Add a member to a group
+export const addMember = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { userId } = req.body;
+  try {
+    // Check if user is already a member
+    const existing = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+    if (existing) {
+      res.status(400).json({ error: 'User is already a member' });
+      return;
+    }
+    const member = await prisma.groupMember.create({
+      data: {
+        userId,
+        groupId,
+        role: 'MEMBER',
+        permissions: {
+          sendMessage: true,
+          uploadFiles: false,
+          createTopics: false,
+          inviteMembers: false,
+          viewMembers: true,
+        },
+      },
+    });
+    res.status(201).json(member);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add member' });
+  }
+};
+
