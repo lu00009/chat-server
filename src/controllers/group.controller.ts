@@ -1,17 +1,15 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/prisma';
-import type {} from '../types/express'; // Ensure the type augmentation is loaded
+import type { } from '../types/express'; // Ensure the type augmentation is loaded
 
 // Create group: creator is assigned automatically as CREATOR with full rights
-// ... (rest of your imports and function signature)
-
 export const createGroup = async (req: Request, res: Response): Promise<void> => {
   const { name, description, isPrivate } = req.body;
-  const userId = req.user.id; // This is the ID of the user creating the group
+  // Use non-null assertion operator (!) as authenticate middleware ensures req.user is defined
+  const userId = req.user!.id;
 
   try {
-    // In group.controller.js, inside createGroup
-console.log('Received userId in createGroup:', userId);
+    console.log('Received userId in createGroup:', userId);
     // Step 1: Validate the user exists. This is crucial to prevent the foreign key error.
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -20,7 +18,6 @@ console.log('Received userId in createGroup:', userId);
     });
 
     if (!existingUser) {
-      // Return an error if the user ID from the request token doesn't exist in the database.
       res.status(400).json({ error: 'Invalid user ID. User does not exist.' });
       return;
     }
@@ -31,7 +28,6 @@ console.log('Received userId in createGroup:', userId);
         name,
         description,
         isPrivate: !!isPrivate, // Ensure boolean type
-        // CORRECT WAY TO LINK THE CREATOR: Use the 'creator' relation field with 'connect'
         creator: {
           connect: {
             id: userId, // This tells Prisma to link the group to the User with this ID
@@ -44,7 +40,6 @@ console.log('Received userId in createGroup:', userId);
             role: 'CREATOR', // Set their role as defined in your Role enum
             permissions: {
               // Define explicit default permissions for a CREATOR here
-              // Based on your promoteToAdmin, demoteToMember, etc., you might want to mirror admin permissions here
               sendMessage: true,
               uploadFiles: true,
               createTopics: true,
@@ -82,11 +77,8 @@ console.log('Received userId in createGroup:', userId);
 
     // More specific error handling based on Prisma error codes
     if (err.code === 'P2002' && err.meta?.target?.includes('name')) {
-        // Example: Handle unique constraint violation on group name if you add one
         res.status(409).json({ error: 'Group with this name already exists.' });
     } else if (err.code === 'P2003') {
-        // This should ideally be caught by your existingUser check,
-        // but it's good to have as a fallback.
         res.status(400).json({ error: 'Foreign key constraint violated. The associated user does not exist.' });
     } else {
         res.status(500).json({ error: 'Failed to create group.' });
@@ -95,12 +87,10 @@ console.log('Received userId in createGroup:', userId);
 };
 
 
-
-
 // Join group as MEMBER with default permissions
 export const joinGroup = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
 
   try {
     const existing = await prisma.groupMember.findUnique({
@@ -315,7 +305,7 @@ export const deleteGroup = async (req: Request, res: Response): Promise<void> =>
 
 // Leave group (member leaves, creator cannot leave)
 export const leaveGroup = async (req: Request, res: Response): Promise<void> => {
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
   const { groupId } = req.params;
 
   try {
@@ -350,7 +340,7 @@ export const leaveGroup = async (req: Request, res: Response): Promise<void> => 
 export const createTopic = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
   const { title } = req.body;
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
 
   try {
     // Check if user is a member and has manageTopics permission
@@ -387,7 +377,7 @@ export const createTopic = async (req: Request, res: Response): Promise<void> =>
 // Get all topics in a group (requires viewMembers permission)
 export const getTopics = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
 
   try {
     // Check if user is a member
@@ -416,7 +406,7 @@ export const getTopics = async (req: Request, res: Response): Promise<void> => {
 export const updateTopic = async (req: Request, res: Response): Promise<void> => {
   const { groupId, topicId } = req.params;
   const { title } = req.body;
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
 
   try {
     // Check if user is a member and has manageTopics permission
@@ -460,7 +450,7 @@ export const updateTopic = async (req: Request, res: Response): Promise<void> =>
 // Delete a topic (requires manageTopics permission)
 export const deleteTopic = async (req: Request, res: Response): Promise<void> => {
   const { groupId, topicId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user!.id; // Use non-null assertion operator (!)
 
   try {
     // Check if user is a member and has manageTopics permission
@@ -499,4 +489,3 @@ export const deleteTopic = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ error: 'Failed to delete topic' });
   }
 };
-

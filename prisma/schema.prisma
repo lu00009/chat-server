@@ -1,13 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
 
 generator client {
-  provider      = "prisma-client-js"
-  output        = "../src/generated/prisma"
-  binaryTargets = ["native"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -16,44 +10,49 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String    // <--- Ensure this line exists and is correct
-  name      String?   // Or String if you made it required and handled it with ?? ''
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  groupMemberships GroupMember[]
-  createdGroups Group[] @relation("UserCreatedGroups")
+  id          String        @id @default(uuid())
+  email       String        @unique
+  name        String
+  password    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  groups      Group[]       // A user can create many groups
+  memberships GroupMember[] // A user can be a member of many groups
+  topics      Topic[]       // ADD THIS LINE: A user can create many topics
 }
 
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  // REMOVED: members GroupMember[] - managed via GroupMember.role string and DB foreign key
+}
 
 model Group {
   id          String        @id @default(uuid())
-  name        String
+  name        String        @unique
   description String?
   isPrivate   Boolean       @default(false)
-  createdBy   String
-  creator     User          @relation("UserCreatedGroups", fields: [createdBy], references: [id])
-  members     GroupMember[]
-  topics      Topic[]
+  createdBy   String // Foreign key to User
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-
+  creator     User          @relation(fields: [createdBy], references: [id])
+  members     GroupMember[] // A group can have many members (crucial for nested create)
+  topics      Topic[]       // A group can have many topics
 }
 
 model GroupMember {
-  id         String   @id @default(uuid())
-  userId     String
-  groupId    String
-  role       Role     @default(MEMBER)
-  permissions Json    @default("{}") // e.g., { "sendMessage": true, ... }
-  joinedAt   DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  groupId     String
+  role        String   @default("MEMBER") // This will store the role name (e.g., 'CREATOR', 'ADMIN', 'MEMBER')
+  permissions Json     @default("{}") // JSONB type in Postgres
+  joinedAt    DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
-  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <--- ADD THIS if you want topics to be deleted
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-
-  @@unique([userId, groupId])
+  @@unique([userId, groupId]) // Composite unique key
+  @@index([role]) // Add an index for efficient lookups by role if needed
 }
 
 model Topic {
@@ -62,12 +61,7 @@ model Topic {
   groupId   String
   createdBy String
   createdAt DateTime @default(now())
-  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) 
 
-}
-
-enum Role {
-  CREATOR   // Full power, cannot be removed
-  ADMIN     // Full power (except delete group)
-  MEMBER    // Follows permissions
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator   User  @relation(fields: [createdBy], references: [id]) // Creator is a User
 }

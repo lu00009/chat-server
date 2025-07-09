@@ -1,12 +1,16 @@
-import { Request, Response, NextFunction } from 'express';
+// src/middlewares/group/permission.ts
+
+import { NextFunction, Request, Response } from 'express';
 import prisma from '../../prisma/prisma';
+import type { } from '../../types/express'; // This is correct and necessary
 
 /**
  * Check if the current user is the group creator
  */
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
-  const userId = req.user.id;
+  // Use non-null assertion operator (!) because the authenticate middleware ensures req.user is set
+  const userId = req.user!.id;
 
   try {
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -32,7 +36,8 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
 export const hasPermission = (action: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { groupId } = req.params;
-    const userId = req.user.id;
+    // Use non-null assertion operator (!)
+    const userId = req.user!.id;
 
     try {
       const membership = await prisma.groupMember.findUnique({
