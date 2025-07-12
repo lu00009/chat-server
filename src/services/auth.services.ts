@@ -1,6 +1,6 @@
 // src/services/auth.services.ts
 
-import { PrismaClient } from '../generated/prisma'; // CORRECTED IMPORT PATH
+import { PrismaClient } from '@prisma/client';
 import { comparePassword, hashPassword } from '../utils/auth.utils';
 
 const prisma = new PrismaClient();
@@ -32,5 +32,16 @@ export const AuthService = {
     // Don't return password in the response
     const { password: _pw, ...userWithoutPassword } = user;
     return userWithoutPassword;
+  },
+  getAllUsers: async () => {
+    return prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
   }
 };

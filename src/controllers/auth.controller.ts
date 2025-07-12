@@ -29,5 +29,15 @@ export const AuthController = {
   async profile(req: Request, res: Response) {
     console.log('GET /auth/profile route hit');
     // ... existing code ...
+  },
+  async users(req: Request, res: Response){
+    console.log('GET /auth/users route hit');
+    try {
+      const users = await AuthService.getAllUsers();
+      res.json(users);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
+

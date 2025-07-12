@@ -6,6 +6,10 @@ import prisma from '../../prisma/prisma';
  */
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
   const userId = req.user.id;
 
   try {
@@ -32,6 +36,10 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
 export const hasPermission = (action: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { groupId } = req.params;
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
     const userId = req.user.id;
 
     try {

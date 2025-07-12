@@ -68,5 +68,20 @@ router.post('/login', AuthController.login);
 router.get('/profile', authenticate, (req, res) => {
   res.json({ userId: req.user?.id });
 });
+/**
+ * @swagger
+ * /auth/users:
+ *   get:
+ *     summary: Get current users
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Users
+ */
+
+router.get('/users', authenticate, AuthController.users)
+
 
 export default router;

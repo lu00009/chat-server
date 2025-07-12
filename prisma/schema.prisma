@@ -6,7 +6,6 @@
 
 generator client {
   provider      = "prisma-client-js"
-  output        = "../src/generated/prisma"
   binaryTargets = ["native"]
 }
 
@@ -24,6 +23,8 @@ model User {
   updatedAt DateTime  @updatedAt
   groupMemberships GroupMember[]
   createdGroups Group[] @relation("UserCreatedGroups")
+
+  @@map("User")
 }
 
 
@@ -39,10 +40,13 @@ model Group {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  @@map("Group")
 }
 
 model GroupMember {
+
   id         String   @id @default(uuid())
+  name       String // Corrected from username to name
   userId     String
   groupId    String
   role       Role     @default(MEMBER)
@@ -52,8 +56,8 @@ model GroupMember {
   user  User  @relation(fields: [userId], references: [id])
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) // <--- ADD THIS if you want topics to be deleted
 
-
   @@unique([userId, groupId])
+  @@map("GroupMember")
 }
 
 model Topic {
@@ -64,6 +68,7 @@ model Topic {
   createdAt DateTime @default(now())
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade) 
 
+  @@map("Topic")
 }
 
 enum Role {
