@@ -32,14 +32,18 @@ export const AuthController = {
 
   async profile(req: Request, res: Response) {
     console.log('GET /auth/profile route hit');
+
+    // ... existing code ...
+  },
+  async users(req: Request, res: Response){
+    console.log('GET /auth/users route hit');
     try {
-      // Assuming your authenticate middleware has attached req.user
-      const userId = req.user!.id; // Use non-null assertion as middleware ensures it
-      // Call the getProfile method on the AuthService object
-      const userProfile = await AuthService.getProfile(userId);
-      res.json(userProfile);
+      const users = await AuthService.getAllUsers();
+      res.json(users);
     } catch (error: any) {
-      res.status(401).json({ error: error.message });
+      res.status(500).json({ error: error.message });
+
     }
   }
 };
+

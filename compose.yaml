@@ -28,6 +28,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # --- ADD/MODIFY THIS VOLUMES SECTION ---
+    volumes:
+      - .:/app # This mounts your host project directory to /app in the container
+      - /app/node_modules # This explicitly tells Docker *not* to sync node_modules back to host,
+                          # preventing potential issues with host/container OS differences
+    # ---------------------------------------
     develop:
       watch:
         - action: sync
@@ -37,6 +43,7 @@ services:
             - node_modules/
         - action: rebuild
           path: package.json
+    command: pnpm run dev
 
 volumes:
   postgres-data:

@@ -1,41 +1,145 @@
 import express from 'express';
 import {
   createGroup,
-  joinGroup,
-  promoteToAdmin,
-  updatePermissions,
-  getMembers,demoteToMember, deleteGroup, leaveGroup ,
-  createTopic, getTopics, updateTopic, deleteTopic
+  deleteGroup,
+  leaveGroup,
+  getGroups,
+  getGroupById,
+  updateGroupById,
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
-import { isCreator, hasPermission } from '../middlewares/group/permission';
+import { isCreator } from '../middlewares/group/permission';
 
 const router = express.Router();
 
 router.use(authenticate);
 
+/**
+ * @swagger
+ * /group/create:
+ *   post:
+ *     summary: Create a new group
+ *     tags: [Groups]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               isPrivate:
+ *                 type: boolean
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Group created
+ */
+
 router.post('/create', createGroup);
 
-router.post('/join/:groupId', joinGroup);
-
-router.get('/:groupId/members', hasPermission('viewMembers'), getMembers);
-
-router.post('/:groupId/promote/:memberId', hasPermission('manageMembers'), promoteToAdmin);
-
-router.patch('/:groupId/permissions/:memberId', hasPermission('managePermissions'), updatePermissions);
-
-router.post('/:groupId/demote/:memberId', hasPermission('manageMembers'), demoteToMember);
+/**
+ * @swagger
+ * /group/{groupId}:
+ *   delete:
+ *     summary: Delete a group
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Group deleted
+ */
 
 router.delete('/:groupId', isCreator, deleteGroup);
 
+/**
+ * @swagger
+ * /group/{groupId}/leave:
+ *   post:
+ *     summary: Leave a group
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Left group
+ */
+
 router.post('/:groupId/leave', leaveGroup);
 
-router.post('/:groupId/topics', hasPermission('manageTopics'), createTopic);
+/**
+ * @swagger
+ * /group:
+ *   get:
+ *     summary: Get all groups
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of groups
+ */
+router.get('/', getGroups);
 
-router.get('/:groupId/topics', hasPermission('viewTopics'), getTopics);
+/**
+ * @swagger
+ * /group/{groupId}:
+ *   get:
+ *     summary: Get a group by ID
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Group details
+ *       404:
+ *         description: Group not found
+ */
+router.get('/:groupId', getGroupById);
 
-router.put('/:groupId/topics/:topicId', hasPermission('manageTopics'), updateTopic);
-
-router.delete('/:groupId/topics/:topicId', hasPermission('manageTopics'), deleteTopic);
+/**
+ * @swagger
+ * /group/{groupId}:
+ *   patch:
+ *     summary: Update a group by ID
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Group updated
+ *       404:
+ *         description: Group not found
+ */
+router.patch('/:groupId', isCreator, updateGroupById); 
 
 export default router;

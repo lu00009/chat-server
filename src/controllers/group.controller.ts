@@ -1,15 +1,18 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/prisma';
-import type { } from '../types/express'; // Ensure the type augmentation is loaded
-
+import type {} from '../types/express'; // Ensure the type augmentation is loaded
+import { CREATOR_PERMISSIONS } from '../middlewares/group/permission';
 // Create group: creator is assigned automatically as CREATOR with full rights
+// ... (rest of your imports and function signature)
+
 export const createGroup = async (req: Request, res: Response): Promise<void> => {
   const { name, description, isPrivate } = req.body;
-  // Use non-null assertion operator (!) as authenticate middleware ensures req.user is defined
-  const userId = req.user!.id;
+  const userId = req.user?.id;
+  const username = req.user?.name // This is the ID of the user creating the group
 
   try {
-    console.log('Received userId in createGroup:', userId);
+    // In group.controller.js, inside createGroup
+console.log('Received userId in createGroup:', userId);
     // Step 1: Validate the user exists. This is crucial to prevent the foreign key error.
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -18,6 +21,7 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
     });
 
     if (!existingUser) {
+      // Return an error if the user ID from the request token doesn't exist in the database.
       res.status(400).json({ error: 'Invalid user ID. User does not exist.' });
       return;
     }
@@ -28,6 +32,7 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
         name,
         description,
         isPrivate: !!isPrivate, // Ensure boolean type
+        // CORRECT WAY TO LINK THE CREATOR: Use the 'creator' relation field with 'connect'
         creator: {
           connect: {
             id: userId, // This tells Prisma to link the group to the User with this ID
@@ -36,19 +41,10 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
         // Also create an entry in the GroupMember table for the creator
         members: {
           create: {
-            userId, // The ID of the user becoming a member
+            userId: userId as string, // Ensure userId is a string
+            name: username ?? '', // Add the required 'name' property and ensure it's a primitive string
             role: 'CREATOR', // Set their role as defined in your Role enum
-            permissions: {
-              // Define explicit default permissions for a CREATOR here
-              sendMessage: true,
-              uploadFiles: true,
-              createTopics: true,
-              inviteMembers: true,
-              viewMembers: true,
-              manageMembers: true,
-              managePermissions: true,
-              manageTopics: true,
-            },
+            permissions: CREATOR_PERMISSIONS,
           },
         },
       },
@@ -77,8 +73,11 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
 
     // More specific error handling based on Prisma error codes
     if (err.code === 'P2002' && err.meta?.target?.includes('name')) {
+        // Example: Handle unique constraint violation on group name if you add one
         res.status(409).json({ error: 'Group with this name already exists.' });
     } else if (err.code === 'P2003') {
+        // This should ideally be caught by your existingUser check,
+        // but it's good to have as a fallback.
         res.status(400).json({ error: 'Foreign key constraint violated. The associated user does not exist.' });
     } else {
         res.status(500).json({ error: 'Failed to create group.' });
@@ -87,195 +86,47 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
 };
 
 
-// Join group as MEMBER with default permissions
-export const joinGroup = async (req: Request, res: Response): Promise<void> => {
-  const { groupId } = req.params;
-  const userId = req.user!.id; // Use non-null assertion operator (!)
 
-  try {
-    const existing = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
-    });
-    if (existing) {
-      res.status(400).json({ error: 'Already a member' });
-      return;
-    }
 
-    const member = await prisma.groupMember.create({
-      data: {
-        userId,
-        groupId,
-        role: 'MEMBER',
-        permissions: {
-          sendMessage: true,
-          uploadFiles: false,
-          createTopics: false,
-          inviteMembers: false,
-          viewMembers: true,
-        },
-      },
-    });
+// // Join group as MEMBER with default permissions
+// export const joinGroup = async (req: Request, res: Response): Promise<void> => {
+//   const { groupId } = req.params;
+//   const userId = req.user.id;
 
-    res.status(201).json(member);
-    return;
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to join group' });
-    return;
-  }
-};
+//   try {
+//     const existing = await prisma.groupMember.findUnique({
+//       where: { userId_groupId: { userId, groupId } },
+//     });
+//     if (existing) {
+//       res.status(400).json({ error: 'Already a member' });
+//       return;
+//     }
 
-// Promote member to ADMIN
-export const promoteToAdmin = async (req: Request, res: Response): Promise<void> => {
-  const { groupId, memberId } = req.params;
+//     const member = await prisma.groupMember.create({
+//       data: {
+//         userId,
+//         groupId,
+//         role: 'MEMBER',
+//         permissions: {
+//           sendMessage: true,
+//           uploadFiles: false,
+//           createTopics: false,
+//           inviteMembers: false,
+//           viewMembers: true,
+//         },
+//       },
+//     });
 
-  try {
-    // Prevent promoting CREATOR or invalid member
-    const member = await prisma.groupMember.findUnique({
-      where: {
-        userId_groupId: { userId: memberId, groupId },
-      },
-    });
+//     res.status(201).json(member);
+//     return;
+//   } catch (err) {
+//     res.status(500).json({ error: 'Failed to join group' });
+//     return;
+//   }
+// };
 
-    if (!member) {
-      res.status(404).json({ error: 'Member not found' });
-      return;
-    }
-    if (member.role === 'CREATOR') {
-      res.status(400).json({ error: 'Creator cannot be promoted' });
-      return;
-    }
-
-    const updated = await prisma.groupMember.update({
-      where: {
-        userId_groupId: { userId: memberId, groupId },
-      },
-      data: {
-        role: 'ADMIN',
-        permissions: {
-          sendMessage: true,
-          uploadFiles: true,
-          createTopics: true,
-          inviteMembers: true,
-          viewMembers: true,
-          manageMembers: true,
-          managePermissions: true,
-          manageTopics: true,
-        },
-      },
-    });
-
-    res.json({ message: 'User promoted to admin', updated });
-    return;
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to promote user' });
-    return;
-  }
-};
-
-// Update permissions for a member (admins or creator only)
-export const updatePermissions = async (req: Request, res: Response): Promise<void> => {
-  const { groupId, memberId } = req.params;
-  const permissions = req.body.permissions;
-
-  try {
-    // Optional: Basic validation if permissions is not an object
-    if (typeof permissions !== 'object' || permissions === null) {
-      console.log('Invalid permissions object received:', permissions);
-      res.status(400).json({ error: 'Invalid permissions object provided. Must be a JSON object.' });
-      return;
-    }
-
-    const updated = await prisma.groupMember.update({
-      where: {
-        userId_groupId: { userId: memberId, groupId },
-      },
-      data: {
-        permissions, // Pass the extracted permissions directly
-      },
-    });
-
-    // --- ADD THIS CONSOLE LOG ---
-    console.log('Prisma update result (returned object):', updated);
-
-    res.json({ message: 'Permissions updated successfully', updated }); // Updated message
-    return;
-  } catch (err: any) { // Explicitly type err
-    console.error('Error updating permissions:', err);
-    // More specific error handling
-    if (err.code === 'P2025') {
-      // Record to update not found (userId or groupId mismatch)
-      res.status(404).json({ error: 'Group member not found with the provided user and group IDs.' });
-    } else if (err.code === 'P2003') {
-        // Foreign key constraint (shouldn't happen here if P2025 is handled)
-        res.status(400).json({ error: 'Invalid user or group ID referenced.' });
-    }
-    else {
-      res.status(500).json({ error: 'Failed to update permissions.' });
-    }
-    return;
-  }
-};
-
-// List all members of a group with user info
-export const getMembers = async (req: Request, res: Response): Promise<void> => {
-  const { groupId } = req.params;
-
-  try {
-    const members = await prisma.groupMember.findMany({
-      where: { groupId },
-      include: {
-        user: {
-          select: { id: true, email: true, name: true },
-        },
-      },
-    });
-
-    res.json(members);
-    return;
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to get members' });
-    return;
-  }
-};
-// Demote admin to member
-export const demoteToMember = async (req: Request, res: Response): Promise<void> => {
-  const { groupId, memberId } = req.params;
-
-  try {
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId: memberId, groupId } },
-    });
-
-    if (!member) {
-      res.status(404).json({ error: 'Member not found' });
-      return;
-    }
-    if (member.role === 'CREATOR') {
-      res.status(400).json({ error: 'Creator cannot be demoted' });
-      return;
-    }
-
-    const updated = await prisma.groupMember.update({
-      where: { userId_groupId: { userId: memberId, groupId } },
-      data: {
-        role: 'MEMBER',
-        permissions: {
-          sendMessage: true,
-          uploadFiles: false,
-          createTopics: false,
-          inviteMembers: false,
-          viewMembers: true,
-        },
-      },
-    });
-
-    res.json({ message: 'User demoted to member', updated });
-    return;
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to demote user' });
-    return;
-  }
-};
+// Remove promoteToAdmin, updatePermissions, getMembers, demoteToMember, addMember, createTopic, getTopics, updateTopic, and deleteTopic from this file.
+// Only keep group-level logic such as createGroup, deleteGroup, leaveGroup, getGroupById, getGroups.
 
 // In your deleteGroup function
 export const deleteGroup = async (req: Request, res: Response): Promise<void> => {
@@ -305,8 +156,13 @@ export const deleteGroup = async (req: Request, res: Response): Promise<void> =>
 
 // Leave group (member leaves, creator cannot leave)
 export const leaveGroup = async (req: Request, res: Response): Promise<void> => {
-  const userId = req.user!.id; // Use non-null assertion operator (!)
+  const userId = req.user?.id;
   const { groupId } = req.params;
+
+  if (!userId) {
+    res.status(400).json({ error: 'User ID is required.' });
+    return;
+  }
 
   try {
     const member = await prisma.groupMember.findUnique({
@@ -334,158 +190,69 @@ export const leaveGroup = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// Topic Management Controllers
-
-// Create a new topic (requires manageTopics permission)
-export const createTopic = async (req: Request, res: Response): Promise<void> => {
+// Get a group by ID
+export const getGroupById = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
-  const { title } = req.body;
-  const userId = req.user!.id; // Use non-null assertion operator (!)
-
   try {
-    // Check if user is a member and has manageTopics permission
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
-    });
-
-    if (!member) {
-      res.status(404).json({ error: 'You are not a member of this group' });
-      return;
-    }
-
-    const permissions = member.permissions as any;
-    if (!permissions.manageTopics) {
-      res.status(403).json({ error: 'You do not have permission to manage topics' });
-      return;
-    }
-
-    const topic = await prisma.topic.create({
-      data: {
-        title,
-        groupId,
-        createdBy: userId,
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true, name: true } },        topics: true,
       },
     });
-
-    res.status(201).json(topic);
+    if (!group) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+    console.log('checking',group?.members)
+    res.json(group);
   } catch (err) {
-    console.error('Error creating topic:', err);
-    res.status(500).json({ error: 'Failed to create topic' });
+    res.status(500).json({ error: 'Failed to get group' });
   }
 };
 
-// Get all topics in a group (requires viewMembers permission)
-export const getTopics = async (req: Request, res: Response): Promise<void> => {
+// Get all groups
+export const getGroups = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const groups = await prisma.group.findMany({
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true} },
+        topics: true,
+      },
+    });
+    res.json(groups);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get groups' });
+  }
+};
+
+// Update a group by ID
+export const updateGroupById = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
-  const userId = req.user!.id; // Use non-null assertion operator (!)
-
+  const { name, description, isPrivate } = req.body;    
   try {
-    // Check if user is a member
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
+    const group = await prisma.group.update({
+      where: { id: groupId },
+      data: {
+        name,
+        description,
+        isPrivate: !!isPrivate, // Ensure boolean type
+      },
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true } },
+        topics: true,
+      },
     });
-
-    if (!member) {
-      res.status(404).json({ error: 'You are not a member of this group' });
-      return;
-    }
-
-    const topics = await prisma.topic.findMany({
-      where: { groupId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(topics);
+    res.json(group);
   } catch (err) {
-    console.error('Error getting topics:', err);
-    res.status(500).json({ error: 'Failed to get topics' });
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as any).code === 'P2025') {
+      res.status(404).json({ error: 'Group not found' });
+    } else {
+      res.status(500).json({ error: 'Failed to update group' });
+    }
   }
 };
 
-// Update a topic (requires manageTopics permission)
-export const updateTopic = async (req: Request, res: Response): Promise<void> => {
-  const { groupId, topicId } = req.params;
-  const { title } = req.body;
-  const userId = req.user!.id; // Use non-null assertion operator (!)
-
-  try {
-    // Check if user is a member and has manageTopics permission
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
-    });
-
-    if (!member) {
-      res.status(404).json({ error: 'You are not a member of this group' });
-      return;
-    }
-
-    const permissions = member.permissions as any;
-    if (!permissions.manageTopics) {
-      res.status(403).json({ error: 'You do not have permission to manage topics' });
-      return;
-    }
-
-    // Check if topic exists and belongs to this group
-    const existingTopic = await prisma.topic.findFirst({
-      where: { id: topicId, groupId },
-    });
-
-    if (!existingTopic) {
-      res.status(404).json({ error: 'Topic not found' });
-      return;
-    }
-
-    const updatedTopic = await prisma.topic.update({
-      where: { id: topicId },
-      data: { title },
-    });
-
-    res.json(updatedTopic);
-  } catch (err) {
-    console.error('Error updating topic:', err);
-    res.status(500).json({ error: 'Failed to update topic' });
-  }
-};
-
-// Delete a topic (requires manageTopics permission)
-export const deleteTopic = async (req: Request, res: Response): Promise<void> => {
-  const { groupId, topicId } = req.params;
-  const userId = req.user!.id; // Use non-null assertion operator (!)
-
-  try {
-    // Check if user is a member and has manageTopics permission
-    const member = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId, groupId } },
-    });
-
-    if (!member) {
-      res.status(404).json({ error: 'You are not a member of this group' });
-      return;
-    }
-
-    const permissions = member.permissions as any;
-    if (!permissions.manageTopics) {
-      res.status(403).json({ error: 'You do not have permission to manage topics' });
-      return;
-    }
-
-    // Check if topic exists and belongs to this group
-    const existingTopic = await prisma.topic.findFirst({
-      where: { id: topicId, groupId },
-    });
-
-    if (!existingTopic) {
-      res.status(404).json({ error: 'Topic not found' });
-      return;
-    }
-
-    await prisma.topic.delete({
-      where: { id: topicId },
-    });
-
-    res.json({ message: 'Topic deleted successfully' });
-  } catch (err) {
-    console.error('Error deleting topic:', err);
-    res.status(500).json({ error: 'Failed to delete topic' });
-  }
-};

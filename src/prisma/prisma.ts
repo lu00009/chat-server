@@ -1,4 +1,6 @@
-// src/prisma/prisma.ts
+
+import { PrismaClient } from '@prisma/client';
+
 
 import { PrismaClient } from '@prisma/client'; // Use '@prisma/client' directly
 
