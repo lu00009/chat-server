@@ -24,6 +24,8 @@ const router = Router();
  *             properties:
  *               title:
  *                 type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       201:
  *         description: Topic created
@@ -42,6 +44,8 @@ router.post('/:groupId/topics', createTopic);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of topics
@@ -74,6 +78,8 @@ router.get('/:groupId/topics', getTopics);
  *             properties:
  *               title:
  *                 type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Topic updated
@@ -97,6 +103,8 @@ router.patch('/:groupId/:topicId', updateTopic);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Topic deleted

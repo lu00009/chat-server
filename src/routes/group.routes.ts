@@ -4,7 +4,8 @@ import {
   deleteGroup,
   leaveGroup,
   getGroups,
-  getGroupById
+  getGroupById,
+  updateGroupById,
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { isCreator } from '../middlewares/group/permission';
@@ -32,6 +33,8 @@ router.use(authenticate);
  *                 type: string
  *               isPrivate:
  *                 type: boolean
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       201:
  *         description: Group created
@@ -51,6 +54,8 @@ router.post('/create', createGroup);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Group deleted
@@ -70,6 +75,8 @@ router.delete('/:groupId', isCreator, deleteGroup);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Left group
@@ -83,6 +90,8 @@ router.post('/:groupId/leave', leaveGroup);
  *   get:
  *     summary: Get all groups
  *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of groups
@@ -101,6 +110,8 @@ router.get('/', getGroups);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Group details
@@ -108,5 +119,27 @@ router.get('/', getGroups);
  *         description: Group not found
  */
 router.get('/:groupId', getGroupById);
+
+/**
+ * @swagger
+ * /group/{groupId}:
+ *   patch:
+ *     summary: Update a group by ID
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Group updated
+ *       404:
+ *         description: Group not found
+ */
+router.patch('/:groupId', isCreator, updateGroupById); 
 
 export default router;

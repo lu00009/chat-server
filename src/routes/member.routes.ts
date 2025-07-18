@@ -15,6 +15,8 @@ const router = Router();
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of members
@@ -38,6 +40,17 @@ router.get('/:groupId/members', getMembers);
  *         required: true
  *         schema:
  *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
  *     responses:
  *       200:
  *         description: User promoted
@@ -70,6 +83,10 @@ router.post('/:groupId/promote/:memberId', promoteToAdmin);
  *             properties:
  *               permissions:
  *                 type: object
+ *                 additionalProperties:
+ *                   type: boolean
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Permissions updated
@@ -93,6 +110,17 @@ router.patch('/:groupId/permissions/:memberId', updatePermissions);
  *         required: true
  *         schema:
  *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: User demoted
@@ -120,6 +148,8 @@ router.post('/:groupId/demote/:memberId', demoteToMember);
  *             properties:
  *               userId:
  *                 type: string
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       201:
  *         description: Member added

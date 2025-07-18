@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/prisma';
-
+import { DEFAULT_MEMBER_PERMISSIONS } from '../middlewares/group/permission';
 export const promoteToAdmin = async (req: Request, res: Response): Promise<void> => {
   const { groupId, memberId } = req.params;
   try {
@@ -132,13 +132,7 @@ export const addMember = async (req: Request, res: Response): Promise<void> => {
         userId,
         groupId,
         role: 'MEMBER',
-        permissions: {
-          sendMessage: true,
-          uploadFiles: false,
-          createTopics: false,
-          inviteMembers: false,
-          viewMembers: true,
-        },
+        permissions: DEFAULT_MEMBER_PERMISSIONS,
       },
     });
     res.status(201).json(member);

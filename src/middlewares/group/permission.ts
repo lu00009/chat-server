@@ -4,6 +4,30 @@ import prisma from '../../prisma/prisma';
 /**
  * Check if the current user is the group creator
  */
+
+// The creator gets all permissions
+export const CREATOR_PERMISSIONS = {
+  sendMessage: true,
+  uploadFiles: true,
+  createTopics: true,
+  inviteMembers: true,
+  viewMembers: true,
+  manageMembers: true,
+  managePermissions: true,
+  manageTopics: true,
+};
+
+// A regular member gets a limited set of permissions
+export const DEFAULT_MEMBER_PERMISSIONS = {
+  sendMessage: true,
+  uploadFiles: true,
+  createTopics: false,
+  inviteMembers: true,
+  viewMembers: true,
+  manageMembers: false,
+  managePermissions: false,
+  manageTopics: false,
+};
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
   if (!req.user) {

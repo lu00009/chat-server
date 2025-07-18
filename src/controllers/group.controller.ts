@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/prisma';
 import type {} from '../types/express'; // Ensure the type augmentation is loaded
-
+import { CREATOR_PERMISSIONS } from '../middlewares/group/permission';
 // Create group: creator is assigned automatically as CREATOR with full rights
 // ... (rest of your imports and function signature)
 
@@ -44,17 +44,7 @@ console.log('Received userId in createGroup:', userId);
             userId: userId as string, // Ensure userId is a string
             name: username ?? '', // Add the required 'name' property and ensure it's a primitive string
             role: 'CREATOR', // Set their role as defined in your Role enum
-            permissions: {
-              // Define explicit default permissions for a CREATOR here
-              sendMessage: true,
-              uploadFiles: true,
-              createTopics: true,
-              inviteMembers: true,
-              viewMembers: true,
-              manageMembers: true,
-              managePermissions: true,
-              manageTopics: true,
-            },
+            permissions: CREATOR_PERMISSIONS,
           },
         },
       },
@@ -235,6 +225,34 @@ export const getGroups = async (req: Request, res: Response): Promise<void> => {
     res.json(groups);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get groups' });
+  }
+};
+
+// Update a group by ID
+export const updateGroupById = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { name, description, isPrivate } = req.body;    
+  try {
+    const group = await prisma.group.update({
+      where: { id: groupId },
+      data: {
+        name,
+        description,
+        isPrivate: !!isPrivate, // Ensure boolean type
+      },
+      include: {
+        creator: { select: { id: true, email: true, name: true } },
+        members: { select: { userId: true, role: true, permissions: true } },
+        topics: true,
+      },
+    });
+    res.json(group);
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as any).code === 'P2025') {
+      res.status(404).json({ error: 'Group not found' });
+    } else {
+      res.status(500).json({ error: 'Failed to update group' });
+    }
   }
 };
 
