@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+// Import the AuthService object as a named export
 import { AuthService } from '../services/auth.services';
+import type { } from '../types/express'; // Ensure the type augmentation is loaded
 import { generateToken } from '../utils/auth.utils';
 
 export const AuthController = {
@@ -7,6 +9,7 @@ export const AuthController = {
     console.log('POST /auth/register route hit');
     try {
       console.log('Register request body:', req.body);
+      // Call the register method on the AuthService object
       const user = await AuthService.register(req.body.email, req.body.password, req.body.name);
       res.status(201).json({ message: 'User registered successfully', user });
     } catch (error: any) {
@@ -18,6 +21,7 @@ export const AuthController = {
     console.log('POST /auth/login route hit');
     try {
       console.log('Login request body:', req.body);
+      // Call the login method on the AuthService object
       const user = await AuthService.login(req.body.email, req.body.password);
       const token = generateToken(String(user.id)); // Convert user.id to string
       res.json({ user, token });
@@ -28,6 +32,7 @@ export const AuthController = {
 
   async profile(req: Request, res: Response) {
     console.log('GET /auth/profile route hit');
+
     // ... existing code ...
   },
   async users(req: Request, res: Response){
@@ -37,6 +42,7 @@ export const AuthController = {
       res.json(users);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+
     }
   }
 };

@@ -1,29 +1,49 @@
 // src/services/auth.services.ts
 
+
 import { PrismaClient } from '@prisma/client';
 import { comparePassword, hashPassword } from '../utils/auth.utils';
 
 const prisma = new PrismaClient();
 
-export const AuthService = {
-  async register(email: string, password: string, name?: string) {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) throw new Error('Email already in use');
 
-    return prisma.user.create({
+export const AuthService = {
+  async register(email: string, password: string, name: string) {
+    // Example: Hash password and create user
+    const hashedPassword = "hashed_password_here"; // Replace with actual hashing logic
+    const user = await prisma.user.create({
       data: {
         email,
-        password: await hashPassword(password),
-        name: name ?? '' // Ensures 'name' is always a string
-      }
+        password: hashedPassword,
+        name,
+      },
     });
+    return user;
   },
 
   async login(email: string, password: string) {
+    // Implement your login logic here
+    // Example: Find user by email, compare password, etc.
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.password !== password) { // Replace with actual password comparison
+      throw new Error('Invalid credentials');
+    }
+    return user;
+  },
+
+  async getProfile(userId: string) {
+    // Implement logic to get user profile
     const user = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true, email: true, name: true, password: true }
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
+
     if (!user) throw new Error('Invalid credentials');
 
     const isValid = await comparePassword(password, user.password);
@@ -43,5 +63,7 @@ export const AuthService = {
         updatedAt: true
       }
     });
+
   }
+  // Add other authentication service functions as needed
 };

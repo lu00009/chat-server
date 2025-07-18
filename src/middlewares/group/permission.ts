@@ -1,5 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
+// src/middlewares/group/permission.ts
+
+import { NextFunction, Request, Response } from 'express';
 import prisma from '../../prisma/prisma';
+import type { } from '../../types/express'; // This is correct and necessary
 
 /**
  * Check if the current user is the group creator
@@ -30,11 +33,13 @@ export const DEFAULT_MEMBER_PERMISSIONS = {
 };
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
+
   if (!req.user) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
   const userId = req.user.id;
+
 
   try {
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -60,11 +65,13 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
 export const hasPermission = (action: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { groupId } = req.params;
+
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const userId = req.user.id;
+
 
     try {
       const membership = await prisma.groupMember.findUnique({

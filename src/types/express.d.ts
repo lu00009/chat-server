@@ -1,12 +1,14 @@
-// src/types/express/index.d.ts
-import { User } from '@prisma/client'; // or from your models
+    // src/types/express/index.d.ts
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: User & { id: string }; // Add any custom JWT claims here if needed
+    declare global {
+      namespace Express {
+        interface Request {
+          user?: {
+            id: string;
+          };
+        }
+      }
     }
-  }
-}
 
-export {}; // <-- important to make it a module
+    export { }; // Important for global augmentation to work
+    
