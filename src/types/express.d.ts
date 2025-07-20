@@ -5,6 +5,7 @@
         interface Request {
           user?: {
             id: string;
+            name: string | null;
           };
         }
       }

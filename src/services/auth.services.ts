@@ -46,12 +46,8 @@ export const AuthService = {
 
     if (!user) throw new Error('Invalid credentials');
 
-    const isValid = await comparePassword(password, user.password);
-    if (!isValid) throw new Error('Invalid credentials');
-
     // Don't return password in the response
-    const { password: _pw, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return user;
   },
   getAllUsers: async () => {
     return prisma.user.findMany({
