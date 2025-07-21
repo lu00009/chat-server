@@ -16,14 +16,17 @@ model User {
   password    String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  groups      Group[]       // A user can create many groups
+  groups      Group[] // A user can create many groups
   memberships GroupMember[] // A user can be a member of many groups
-  topics      Topic[]       // ADD THIS LINE: A user can create many topics
+  topics      Topic[] // ADD THIS LINE: A user can create many topics
+  messages    Message[]     @relation("UserMessages")
+  reactions   Reaction[]
+  seen        MessageSeen[]
 }
 
 model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
+  id   Int    @id @default(autoincrement())
+  name String @unique
   // REMOVED: members GroupMember[] - managed via GroupMember.role string and DB foreign key
 }
 
@@ -37,7 +40,8 @@ model Group {
   updatedAt   DateTime      @updatedAt
   creator     User          @relation(fields: [createdBy], references: [id])
   members     GroupMember[] // A group can have many members (crucial for nested create)
-  topics      Topic[]       // A group can have many topics
+  topics      Topic[] // A group can have many topics
+  messages    Message[]
 }
 
 model GroupMember {
@@ -62,6 +66,58 @@ model Topic {
   createdBy String
   createdAt DateTime @default(now())
 
-  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator   User  @relation(fields: [createdBy], references: [id]) // Creator is a User
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator User  @relation(fields: [createdBy], references: [id]) // Creator is a User
+}
+
+model Message {
+  id       String      @id @default(cuid())
+  content  String?
+  type     MessageType @default(TEXT)
+  mediaUrl String?
+
+  sender   User   @relation("UserMessages", fields: [senderId], references: [id])
+  senderId String
+
+  group   Group  @relation(fields: [groupId], references: [id])
+  groupId String
+
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replyToId String?
+  replies   Message[] @relation("MessageReplies")
+
+  reactions Reaction[]
+  seenBy    MessageSeen[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deleted   Boolean  @default(false)
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  message   Message  @relation(fields: [messageId], references: [id])
+  messageId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, messageId, emoji])
+}
+
+model MessageSeen {
+  id        String   @id @default(cuid())
+  message   Message  @relation(fields: [messageId], references: [id])
+  messageId String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  seenAt    DateTime @default(now())
+  @@unique([userId, messageId])
+}
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VIDEO
 }

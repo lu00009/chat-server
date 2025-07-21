@@ -16,27 +16,39 @@ services:
       retries: 5
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
 
   app:
     build:
       context: .
-    image: nextjs-dev
     ports:
       - "3002:3000"
-    env_file:
-      - .env
+    environment:
+      NODE_ENV: development
+      CLIENT_URL: http://localhost:3000
+      SOCKET_PATH: /socket.io  
+      DEBUG: socket.io:*
+      DATABASE_URL: postgresql://user:password@db:5432/mydb?schema=public
+      WS_PING_TIMEOUT: "60000"
+      WS_PING_INTERVAL: "25000"
     depends_on:
       db:
         condition: service_healthy
-    develop:
-      watch:
-        - action: sync
-          path: ./src
-          target: /app/src
-          ignore:
-            - node_modules/
-        - action: rebuild
-          path: package.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres-data:

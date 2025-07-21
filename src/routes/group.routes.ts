@@ -1,14 +1,20 @@
 import express from 'express';
 import {
   createGroup,
+  createTopic,
+  deleteGroup,
+  deleteTopic,
+  demoteToMember,
+  getMembers,
+  getTopics,
   joinGroup,
+  leaveGroup,
   promoteToAdmin,
   updatePermissions,
-  getMembers,demoteToMember, deleteGroup, leaveGroup ,
-  createTopic, getTopics, updateTopic, deleteTopic
+  updateTopic
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
-import { isCreator, hasPermission } from '../middlewares/group/permission';
+import { hasPermission, isCreator } from '../middlewares/group/permission';
 
 const router = express.Router();
 
