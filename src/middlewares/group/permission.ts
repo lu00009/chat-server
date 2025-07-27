@@ -7,10 +7,39 @@ import type { } from '../../types/express'; // This is correct and necessary
 /**
  * Check if the current user is the group creator
  */
+
+// The creator gets all permissions
+export const CREATOR_PERMISSIONS = {
+  sendMessage: true,
+  uploadFiles: true,
+  createTopics: true,
+  inviteMembers: true,
+  viewMembers: true,
+  manageMembers: true,
+  managePermissions: true,
+  manageTopics: true,
+};
+
+// A regular member gets a limited set of permissions
+export const DEFAULT_MEMBER_PERMISSIONS = {
+  sendMessage: true,
+  uploadFiles: true,
+  createTopics: false,
+  inviteMembers: true,
+  viewMembers: true,
+  manageMembers: false,
+  managePermissions: false,
+  manageTopics: false,
+};
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
-  // Use non-null assertion operator (!) because the authenticate middleware ensures req.user is set
-  const userId = req.user!.id;
+
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const userId = req.user.id;
+
 
   try {
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -36,8 +65,13 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
 export const hasPermission = (action: string) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { groupId } = req.params;
-    // Use non-null assertion operator (!)
-    const userId = req.user!.id;
+
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const userId = req.user.id;
+
 
     try {
       const membership = await prisma.groupMember.findUnique({

@@ -1,6 +1,5 @@
-// src/prisma/prisma.ts
 
-import { PrismaClient } from '@prisma/client'; // Use '@prisma/client' directly
+import { PrismaClient } from '@prisma/client';
 
 // Declare a global variable to store the PrismaClient instance.
 // This is a common pattern to ensure a single instance in development
