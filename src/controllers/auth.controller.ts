@@ -12,9 +12,13 @@ export const AuthController = {
       }
 
       const user = await AuthService.register(email, password, name);
+      const token = generateToken(user.id);
+      
       return res.status(201).json({ 
         message: 'User registered successfully', 
-        user 
+        user,
+        token,
+        expiresIn: '1h'
       });
     } catch (error: any) {
       console.error('Registration error:', error);

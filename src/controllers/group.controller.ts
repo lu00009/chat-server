@@ -1,57 +1,54 @@
-import { RoleEnum } from '@prisma/client'; // IMPORTANT: Import RoleEnum
+import { RoleEnum } from '@prisma/client';
 import { Request, Response } from 'express';
-import { CREATOR_PERMISSIONS } from '../middlewares/group/permission'; // Assuming this is correct
+import { CREATOR_PERMISSIONS } from '../middlewares/group/permission';
 import prisma from '../prisma/prisma';
-import type { } from '../types/express'; // Ensure the type augmentation is loaded
+import type { } from '../types/express';
+import { generateInviteCode, randomSuffix, slugify } from '../utils/slugify';
 
 // Create group: creator is assigned automatically as CREATOR with full rights
 export const createGroup = async (req: Request, res: Response): Promise<void> => {
   const { name, description, isPrivate } = req.body;
   const userId = req.user?.id;
-  // const username = req.user?.name; // Removed, as GroupMember no longer has a 'name' field
 
   try {
-    console.log('Received userId in createGroup:', userId);
-
-    // Step 1: Validate the user exists. This is crucial to prevent the foreign key error.
     if (!userId) {
       res.status(400).json({ error: 'User ID is required to create a group.' });
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
-
-    if (!existingUser) {
-      res.status(400).json({ error: 'Invalid user ID. User does not exist.' });
-      return;
+    // Generate a unique slug and invite code.
+    let baseSlug = slugify(name || 'group');
+    if (!baseSlug) baseSlug = 'group';
+    let slugCandidate = baseSlug;
+    let attempt = 0;
+    while (await prisma.group.findUnique({ where: { slug: slugCandidate } })) {
+      attempt++;
+      slugCandidate = `${baseSlug}-${randomSuffix(3)}`;
+      if (attempt > 5) break;
     }
+    const inviteCode = generateInviteCode();
 
-    // Step 2: Create the group, connecting it to the existing user.
+    // Create the group and the creator's membership.
     const group = await prisma.group.create({
       data: {
         name,
         description,
-        isPrivate: !!isPrivate, // Ensure boolean type
-        creator: {
-          connect: {
-            id: userId, // This tells Prisma to link the group to the User with this ID
-          },
+        isPrivate: !!isPrivate,
+        slug: slugCandidate,
+        inviteCode,
+        createdBy: {
+          connect: { id: userId },
         },
         members: {
           create: {
             userId: userId,
-            // REMOVED: name: username ?? '', // GroupMember no longer has a 'name' field
-            role: RoleEnum.CREATOR, // Use the imported RoleEnum
+            role: RoleEnum.CREATOR,
             permissions: CREATOR_PERMISSIONS,
           },
         },
       },
       include: {
-        creator: {
+        createdBy: { // Corrected from 'creator'
           select: {
             id: true,
             email: true,
@@ -63,7 +60,6 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
             userId: true,
             role: true,
             permissions: true,
-            // If you need the member's name, you must select it from the related 'user'
             user: {
               select: {
                 name: true,
@@ -75,9 +71,8 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
     });
 
     res.status(201).json(group);
-  } catch (err: any) { // Explicitly type err for better error handling/logging
+  } catch (err: any) {
     console.error("Error creating group:", err);
-
     if (err.code === 'P2002' && err.meta?.target?.includes('name')) {
       res.status(409).json({ error: 'Group with this name already exists.' });
     } else if (err.code === 'P2003') {
@@ -85,6 +80,71 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
     } else {
       res.status(500).json({ error: 'Failed to create group.' });
     }
+  }
+};
+
+// Join group
+export const joinGroup = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user?.id;
+  const { groupId, code } = req.body;
+
+  if (!userId) {
+    res.status(400).json({ error: 'User ID is required.' });
+    return;
+  }
+
+  if (!groupId && !code) {
+    res.status(400).json({ error: 'Group ID/slug or invite code is required.' });
+    return;
+  }
+
+  try {
+    const group = await prisma.group.findFirst({
+      where: {
+        OR: [
+          { id: groupId },
+          { slug: groupId },
+          { inviteCode: code }
+        ]
+      }
+    });
+
+    if (!group) {
+      res.status(404).json({ error: 'Group not found' });
+      return;
+    }
+
+    const existingMember = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId, groupId: group.id } },
+    });
+
+    if (existingMember) {
+      res.status(400).json({ error: 'You are already a member of this group' });
+      return;
+    }
+
+    await prisma.groupMember.create({
+      data: {
+        userId,
+        groupId: group.id,
+        role: RoleEnum.MEMBER,
+        permissions: {
+          sendMessage: true,
+          uploadFiles: true,
+          viewMembers: true,
+          createTopics: true,
+          manageTopics: false,
+          inviteMembers: false,
+          manageMembers: false,
+          managePermissions: false,
+        },
+      },
+    });
+
+    res.json({ message: 'Successfully joined the group', groupId: group.id, slug: group.slug, inviteCode: group.inviteCode });
+  } catch (err: any) {
+    console.error("Error joining group:", err);
+    res.status(500).json({ error: 'Failed to join group' });
   }
 };
 
@@ -107,7 +167,7 @@ export const leaveGroup = async (req: Request, res: Response): Promise<void> => 
       res.status(404).json({ error: 'You are not a member' });
       return;
     }
-    if (member.role === RoleEnum.CREATOR) { // Use RoleEnum
+    if (member.role === RoleEnum.CREATOR) {
       res.status(403).json({ error: 'Creator cannot leave the group' });
       return;
     }
@@ -117,60 +177,65 @@ export const leaveGroup = async (req: Request, res: Response): Promise<void> => 
     });
 
     res.json({ message: 'You left the group' });
-    return;
-  } catch (err: any) { // Cast error to any
-    console.error("Error leaving group:", err); // Log the actual error for debugging
+  } catch (err: any) {
+    console.error("Error leaving group:", err);
     res.status(500).json({ error: 'Failed to leave group' });
-    return;
   }
 };
 
-// In your deleteGroup function
+// Delete a group
 export const deleteGroup = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
+  const userId = req.user?.id;
+
   try {
-    // Prisma's onDelete: Cascade in schema.prisma should handle related records.
-    // However, if you have specific logic or need to ensure order, you can keep explicit deletes.
-    // If onDelete: Cascade is set for GroupMember and Topic on Group, these deleteMany calls might be redundant.
-    // Check your schema:
-    // GroupMember: group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-    // Topic: group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-    // If they are, you can remove these deleteMany calls.
-
-    // If onDelete: Cascade is NOT set for GroupMember or Topic, keep these lines:
-    await prisma.groupMember.deleteMany({
-      where: { groupId: groupId },
-    });
-    await prisma.topic.deleteMany({
-      where: { groupId: groupId },
+    // Authorization: Only the creator can delete the group
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { createdByUserId: true },
     });
 
-    // Now delete the Group record itself
+    if (!group) {
+      res.status(404).json({ error: 'Group not found.' });
+      return;
+    }
+
+    if (group.createdByUserId !== userId) {
+      res.status(403).json({ error: 'You do not have permission to delete this group.' });
+      return;
+    }
+
     await prisma.group.delete({ where: { id: groupId } });
 
     res.json({ message: 'Group deleted successfully' });
-    return;
-  } catch (err: any) { // Cast error to any
-    console.error("Error deleting group:", err); // Log the actual error for debugging
+  } catch (err: any) {
+    console.error("Error deleting group:", err);
     res.status(500).json({ error: 'Failed to delete group' });
-    return;
   }
 };
 
 // Get a group by ID
 export const getGroupById = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
+  const userId = req.user?.id;
+
   try {
-    const group = await prisma.group.findUnique({
-      where: { id: groupId },
+    const group = await prisma.group.findFirst({
+      where: {
+        OR: [
+          { id: groupId },
+          { slug: groupId },
+          { inviteCode: groupId }
+        ]
+      },
       include: {
-        creator: { select: { id: true, email: true, name: true } },
+        createdBy: { select: { id: true, email: true, name: true } }, // Corrected from 'creator'
         members: {
           select: {
             userId: true,
             role: true,
             permissions: true,
-            user: { // IMPORTANT: Select user to get the name
+            user: {
               select: {
                 name: true,
                 email: true,
@@ -179,72 +244,83 @@ export const getGroupById = async (req: Request, res: Response): Promise<void> =
           },
         },
         topics: true,
-        messages: true, // Assuming you want messages included
+        messages: true,
       },
     });
+
     if (!group) {
       res.status(404).json({ error: 'Group not found' });
       return;
     }
 
-    // Transform members to include name directly if desired for the response structure
+    const isAdmin = group.members.some(member =>
+      member.userId === userId && (member.role === RoleEnum.CREATOR || (member.permissions as any)?.manageMembers === true)
+    );
+
     const transformedGroup = {
       ...group,
+      isAdmin,
+      memberCount: group.members.length,
       members: group.members.map(member => ({
         ...member,
-        name: member.user.name, // Add the user's name directly to the member object
-        email: member.user.email, // Add email if needed
-        // Remove the 'user' sub-object if you want a flatter structure
-        user: undefined, // Optionally remove the nested user object
+        name: member.user.name,
+        email: member.user.email,
+        user: undefined,
       })),
     };
 
-    console.log('checking', transformedGroup?.members);
-    res.json(transformedGroup); // Send the transformed group
-  } catch (err: any) { // Cast error to any
-    console.error("Error getting group by ID:", err); // Log the actual error
+    res.json(transformedGroup);
+  } catch (err: any) {
+    console.error("Error getting group by ID:", err);
     res.status(500).json({ error: 'Failed to get group' });
   }
 };
 
-// Get all groups
+// Get all groups for the current user
 export const getGroups = async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user?.id;
     const groups = await prisma.group.findMany({
+      where: { members: { some: { userId } } },
       include: {
-        creator: { select: { id: true, email: true, name: true } },
+        createdBy: { select: { id: true, email: true, name: true } }, // Corrected from 'creator'
         members: {
           select: {
             userId: true,
             role: true,
             permissions: true,
-            user: { // IMPORTANT: Select user to get the name
-              select: {
-                name: true,
-                email: true,
-              },
-            },
+            user: { select: { name: true, email: true } },
           },
         },
-        topics: true,
-        messages: true, // Assuming you want messages included
+        messages: { select: { id: true } },
       },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Transform members to include name directly if desired for the response structure
-    const transformedGroups = groups.map(group => ({
-      ...group,
-      members: group.members.map(member => ({
-        ...member,
-        name: member.user.name,
-        email: member.user.email,
-        user: undefined, // Optionally remove the nested user object
-      })),
-    }));
-
-    res.json(transformedGroups); // Send the transformed groups
-  } catch (err: any) { // Cast error to any
-    console.error("Error getting all groups:", err); // Log the actual error
+    const transformed = groups.map(g => {
+      const isAdmin = g.members.some(m => m.userId === userId && (m.role === RoleEnum.CREATOR || (m.permissions as any)?.manageMembers));
+      return {
+        id: g.id,
+        slug: g.slug,
+        inviteCode: g.inviteCode,
+        name: g.name,
+        description: g.description,
+        memberCount: g.members.length,
+        isAdmin,
+        createdAt: g.createdAt,
+        lastMessageTime: g.updatedAt,
+        members: g.members.map(m => ({
+          userId: m.userId,
+          role: m.role,
+          permissions: m.permissions,
+          name: m.user?.name,
+          email: m.user?.email,
+        })),
+      };
+    });
+    res.json(transformed);
+  } catch (err: any) {
+    console.error('Error getting user groups:', err);
     res.status(500).json({ error: 'Failed to get groups' });
   }
 };
@@ -253,22 +329,39 @@ export const getGroups = async (req: Request, res: Response): Promise<void> => {
 export const updateGroupById = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
   const { name, description, isPrivate } = req.body;
+  const userId = req.user?.id;
+
   try {
-    const group = await prisma.group.update({
+    const groupToUpdate = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { createdByUserId: true },
+    });
+
+    if (!groupToUpdate) {
+      res.status(404).json({ error: 'Group not found.' });
+      return;
+    }
+
+    if (groupToUpdate.createdByUserId !== userId) {
+      res.status(403).json({ error: 'You do not have permission to update this group.' });
+      return;
+    }
+
+    const updatedGroup = await prisma.group.update({
       where: { id: groupId },
       data: {
         name,
         description,
-        isPrivate: !!isPrivate, // Ensure boolean type
+        isPrivate: !!isPrivate,
       },
       include: {
-        creator: { select: { id: true, email: true, name: true } },
+        createdBy: { select: { id: true, email: true, name: true } }, // Corrected from 'creator'
         members: {
           select: {
             userId: true,
             role: true,
             permissions: true,
-            user: { // IMPORTANT: Select user to get the name
+            user: {
               select: {
                 name: true,
                 email: true,
@@ -277,24 +370,28 @@ export const updateGroupById = async (req: Request, res: Response): Promise<void
           },
         },
         topics: true,
-        messages: true, // Assuming you want messages included
+        messages: true,
       },
     });
 
-    // Transform members to include name directly if desired for the response structure
+    const isAdmin = updatedGroup.members.some(member =>
+      member.userId === userId && (member.role === RoleEnum.CREATOR || (member.permissions as any)?.manageMembers === true)
+    );
+
     const transformedGroup = {
-      ...group,
-      members: group.members.map(member => ({
+      ...updatedGroup,
+      isAdmin,
+      members: updatedGroup.members.map(member => ({
         ...member,
         name: member.user.name,
         email: member.user.email,
-        user: undefined, // Optionally remove the nested user object
+        user: undefined,
       })),
     };
 
-    res.json(transformedGroup); // Send the transformed group
-  } catch (err: any) { // Cast error to any
-    console.error("Error updating group by ID:", err); // Log the actual error
+    res.json(transformedGroup);
+  } catch (err: any) {
+    console.error("Error updating group by ID:", err);
     if (typeof err === 'object' && err !== null && 'code' in err && (err as any).code === 'P2025') {
       res.status(404).json({ error: 'Group not found' });
     } else {

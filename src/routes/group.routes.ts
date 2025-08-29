@@ -4,6 +4,7 @@ import {
   deleteGroup,
   getGroupById,
   getGroups,
+  joinGroup,
   leaveGroup,
   updateGroupById,
 } from '../controllers/group.controller';
@@ -41,6 +42,34 @@ router.use(authenticate);
  */
 
 router.post('/create', createGroup);
+
+/**
+ * @swagger
+ * /group/join:
+ *   post:
+ *     summary: Join a group
+ *     tags: [Groups]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               groupId:
+ *                 type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully joined the group
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Group not found
+ */
+
+router.post('/join', joinGroup);
 
 /**
  * @swagger

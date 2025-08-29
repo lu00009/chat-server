@@ -31,10 +31,27 @@ export const AuthService = {
         updatedAt: user.updatedAt
       };
     } catch (error: any) {
+      console.error('Database error during registration:', error);
+      
       if (error.code === 'P2002') { // Prisma unique constraint violation
         throw new Error('Email already in use');
       }
-      throw new Error('Registration failed');
+      
+      if (error.code === 'P1001') { // Can't reach database server
+        throw new Error('Database connection failed. Please try again later.');
+      }
+      
+      if (error.code === 'P1008') { // Operations timed out
+        throw new Error('Database operation timed out. Please try again.');
+      }
+      
+      if (error.code === 'P1017') { // Server has closed the connection
+        throw new Error('Database connection lost. Please try again.');
+      }
+      
+      // For any other error, provide more specific information
+      const errorMessage = error.message || 'Unknown database error';
+      throw new Error(`Registration failed: ${errorMessage}`);
     }
   },
 

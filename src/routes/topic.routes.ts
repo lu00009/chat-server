@@ -1,7 +1,11 @@
 import { Router } from 'express';
-import { createTopic, getTopics, updateTopic, deleteTopic } from '../controllers/topic.controller';
+import { createTopic, deleteTopic, getTopics, updateTopic } from '../controllers/topic.controller';
+import { authenticate } from '../middlewares/auth/authenticate.middleware';
 
 const router = Router();
+
+// Require auth for all topic endpoints
+router.use(authenticate);
 
 /**
  * @swagger

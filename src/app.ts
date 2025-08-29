@@ -28,7 +28,7 @@ app.use('/group', topicRoutes);
 app.post("/upload", upload.single('file'), (req, res) => {
   res.json({ message: 'File uploaded successfully', file: req.file });
 }); // serve media
-app.use("/message", messageRoutes)// dynamically import messages routes
+app.use("/messages", messageRoutes)// dynamically import messages routes
 
 // Test endpoint
 app.get('/test', (req, res) => {
@@ -59,7 +59,7 @@ topicRoutes.stack.forEach((layer) => {
 });
 messageRoutes.stack.forEach((layer) => {
   if (layer.route) {
-    console.log(`${layer.route.stack[0].method.toUpperCase()} /message${layer.route.path}`);
+    console.log(`${layer.route.stack[0].method.toUpperCase()} /messages${layer.route.path}`);
   }
 });
 

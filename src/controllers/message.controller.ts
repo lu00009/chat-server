@@ -2,25 +2,53 @@ import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats'; // Assuming types/chats.ts is the correct path
 
+// Helper to normalize message type input (frontend sends lowercase like 'text')
+function normalizeMessageType(raw?: string) {
+  if (!raw) return 'TEXT';
+  const upper = raw.toUpperCase();
+  const allowed = ['TEXT','IMAGE','FILE','VIDEO'];
+  return allowed.includes(upper) ? upper : 'TEXT';
+}
+
 // Send a new message
 export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Response) => {
-  const { content, senderId, groupId, type, replyToId } = req.body;
+  const { content, senderId: bodySenderId, groupId, type, replyToId } = req.body;
   const mediaUrl = req.file?.filename ? `/uploads/${req.file.filename}` : null;
+  const authUserId = (req as any).user?.id;
+  const finalSenderId = authUserId || bodySenderId; // prefer authenticated user
   try {
+    if (!finalSenderId) {
+      return res.status(400).json({ error: 'Missing senderId (auth required)' });
+    }
+    if (!groupId) {
+      return res.status(400).json({ error: 'Missing groupId' });
+    }
+
+    // (Optional) Validate membership
+    const membership = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId: finalSenderId, groupId } },
+    });
+    if (!membership) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
+
+    const normalizedType = normalizeMessageType(type);
     const message = await prisma.message.create({
       data: {
-        content,
-        senderId,
+        content: content ?? '',
+        senderId: finalSenderId,
         groupId,
-        type,
+        type: normalizedType as any,
         replyToId,
         mediaUrl,
       },
+      include: { sender: { select: { id: true, name: true, email: true } }, reactions: true, seenBy: true }
     });
 
     res.status(201).json(message);
-  } catch (error) {
-    res.status(500).json({ error: "Could not send message" });
+  } catch (error: any) {
+    console.error('sendMessage error:', error);
+    res.status(500).json({ error: "Could not send message", details: error.message });
   }
 };
 
@@ -40,8 +68,9 @@ export const getGroupMessages = async (req: Request, res: Response) => {
     });
 
     res.json(messages);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch messages" });
+  } catch (error:any) {
+    console.error('getGroupMessages error:', error);
+    res.status(500).json({ error: "Failed to fetch messages", details: error.message });
   }
 };
 
@@ -57,8 +86,9 @@ export const updateMessage = async (req: Request<{messageId: string}, {}, Update
     });
 
     res.json(message);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update message" });
+  } catch (error:any) {
+    console.error('updateMessage error:', error);
+    res.status(500).json({ error: "Failed to update message", details: error.message });
   }
 };
 
@@ -73,17 +103,21 @@ export const deleteMessage = async (req: Request<{messageId: string}>, res: Resp
     });
 
     res.json({ message: "Deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete message" });
+  } catch (error:any) {
+    console.error('deleteMessage error:', error);
+    res.status(500).json({ error: "Failed to delete message", details: error.message });
   }
 };
 
 // React to message
 export const reactToMessage = async (req: Request<{messageId: string}, {}, ReactionBody>, res: Response) => {
   const { messageId } = req.params;
-  const { userId, emoji } = req.body;
+  const { userId: bodyUserId, emoji } = req.body;
+  const authUserId = (req as any).user?.id;
+  const userId = authUserId || bodyUserId;
 
   try {
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
     const reaction = await prisma.reaction.upsert({
       where: {
         userId_messageId_emoji: { userId, messageId, emoji },
@@ -93,8 +127,9 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
     });
 
     res.status(201).json(reaction);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to react to message" });
+  } catch (error:any) {
+    console.error('reactToMessage error:', error);
+    res.status(500).json({ error: "Failed to react to message", details: error.message });
   }
 };
 
@@ -111,8 +146,9 @@ export const removeReaction = async (req: Request<{messageId: string, emoji: str
     });
 
     res.json({ message: "Reaction removed" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to remove reaction" });
+  } catch (error:any) {
+    console.error('removeReaction error:', error);
+    res.status(500).json({ error: "Failed to remove reaction", details: error.message });
   }
 };
 
@@ -129,7 +165,8 @@ export const markMessageSeen = async (req: Request<{messageId: string}, {}, Seen
     });
 
     res.json(seen);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to mark seen" });
+  } catch (error:any) {
+    console.error('markMessageSeen error:', error);
+    res.status(500).json({ error: "Failed to mark seen", details: error.message });
   }
 };

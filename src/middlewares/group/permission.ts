@@ -1,5 +1,4 @@
-// src/middlewares/group/permission.ts
-
+import { RoleEnum } from '@prisma/client';
 import { NextFunction, Request, Response } from 'express';
 import prisma from '../../prisma/prisma';
 import type { } from '../../types/express'; // This is correct and necessary
@@ -47,7 +46,8 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
       res.status(404).json({ error: 'Group not found' });
       return;
     }
-    if (group.createdBy !== userId) {
+    // Corrected the property name from 'createdBy' to 'createdByUserId'
+    if (group.createdByUserId !== userId) {
       res.status(403).json({ error: 'Only the creator can perform this action' });
       return;
     }
@@ -89,13 +89,13 @@ export const hasPermission = (action: string) => {
       }
 
       // Creator always allowed
-      if (membership.role === 'CREATOR') {
+      if (membership.role === RoleEnum.CREATOR) {
         next();
         return;
       }
 
       // Admins have all except 'deleteGroup'
-      if (membership.role === 'ADMIN') {
+      if (membership.role === RoleEnum.ADMIN) {
         if (action === 'deleteGroup') {
           res.status(403).json({ error: 'Only creator can delete group' });
           return;

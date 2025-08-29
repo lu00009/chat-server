@@ -8,18 +8,22 @@ import {
     sendMessage,
     updateMessage,
 } from "../controllers/message.controller";
+import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { upload } from "../middlewares/message/upload";
 
 const router = express.Router();
 
-router.post("/messages", upload.single("file"), sendMessage);
-router.get("/groups/:groupId/messages", getGroupMessages);
-router.patch("/messages/:messageId", updateMessage);
-router.delete("/messages/:messageId", deleteMessage);
+// Require auth for all message endpoints
+router.use(authenticate);
 
-router.post("/messages/:messageId/reactions", reactToMessage);
-router.delete("/messages/:messageId/reactions/:emoji", removeReaction);
+router.post("/", upload.single("file"), sendMessage);
+router.get("/:groupId", getGroupMessages);
+router.patch("/:messageId", updateMessage);
+router.delete("/:messageId", deleteMessage);
 
-router.post("/messages/:messageId/seen", markMessageSeen);
+router.post("/:messageId/reactions", reactToMessage);
+router.delete("/:messageId/reactions/:emoji", removeReaction);
+
+router.post("/:messageId/seen", markMessageSeen);
 
 export default router;

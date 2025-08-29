@@ -1,140 +1,133 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider        = "prisma-client-js"
-  binaryTargets   = ["native"]
+provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+provider = "postgresql"
+url      = env("DATABASE_URL")
 }
 
+// User model to represent a user in the system
 model User {
-  id                String        @id @default(uuid())
-  email             String        @unique
-  password          String
-  name              String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  groupMemberships  GroupMember[]
-  createdGroups     Group[]       @relation("UserCreatedGroups")
-  messages          Message[]     @relation("UserMessages")
-  reactions         Reaction[]
-  seen              MessageSeen[]
-  topics            Topic[]
-
-  @@map("User")
+id              String         @id @default(uuid())
+email           String         @unique
+password        String
+name            String?
+createdAt       DateTime       @default(now())
+updatedAt       DateTime       @updatedAt
+groupsCreated   Group[]        @relation("UserCreatedGroups")
+groupMemberships GroupMember[]
+topicsCreated   Topic[]
+messagesSent    Message[]      @relation("UserMessages")
+reactions       Reaction[]
+messagesSeen    MessageSeen[]
 }
 
-model Role { // This model is not strictly needed if you are only using the enum RoleEnum
-  id   Int    @id @default(autoincrement())
-  name String @unique
+// Enum for user roles within a group
+enum RoleEnum {
+CREATOR
+ADMIN
+MEMBER
 }
 
-model Group {
-  id          String        @id @default(uuid())
-  name        String
-  description String?
-  isPrivate   Boolean       @default(false)
-  createdBy   String
-  creator     User          @relation("UserCreatedGroups", fields: [createdBy], references: [id])
-  members     GroupMember[]
-  topics      Topic[]
-  messages    Message[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  @@map("Group")
-}
-
-model GroupMember {
-  id          String    @id @default(uuid())
-  userId      String
-  groupId     String
-  role        RoleEnum  @default(MEMBER) // Using RoleEnum
-  permissions Json      @default("{}")
-  joinedAt    DateTime  @default(now())
-
-  user        User      @relation(fields: [userId], references: [id])
-  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, groupId])
-  @@map("GroupMember")
-}
-
-model Topic {
-  id          String    @id @default(uuid())
-  title       String
-  groupId     String
-  createdBy   String
-  createdAt   DateTime  @default(now())
-  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator     User      @relation(fields: [createdBy], references: [id])
-
-  @@map("Topic")
-}
-
-enum RoleEnum { // The enum is named RoleEnum
-  CREATOR
-  ADMIN
-  MEMBER
-}
-
-model Message {
-  id        String      @id @default(cuid())
-  content   String?
-  type      MessageType @default(TEXT)
-  mediaUrl  String?
-
-  sender    User        @relation("UserMessages", fields: [senderId], references: [id])
-  senderId  String
-
-  group     Group       @relation(fields: [groupId], references: [id])
-  groupId   String
-
-  replyTo   Message?    @relation("MessageReplies", fields: [replyToId], references: [id])
-  replyToId String?
-  replies   Message[]   @relation("MessageReplies")
-
-  reactions Reaction[]
-  seenBy    MessageSeen[]
-
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  deleted   Boolean     @default(false)
-}
-
-model Reaction {
-  id        String    @id @default(cuid())
-  emoji     String
-  user      User      @relation(fields: [userId], references: [id])
-  userId    String
-  message   Message   @relation(fields: [messageId], references: [id])
-  messageId String
-  createdAt DateTime  @default(now())
-
-  @@unique([userId, messageId, emoji])
-}
-
-model MessageSeen {
-  id        String    @id @default(cuid())
-  message   Message   @relation(fields: [messageId], references: [id])
-  messageId String
-  user      User      @relation(fields: [userId], references: [id])
-  userId    String
-  seenAt    DateTime  @default(now())
-
-  @@unique([userId, messageId])
-}
-
+// Enum for message types
 enum MessageType {
-  TEXT
-  IMAGE
-  FILE
-  VIDEO
+TEXT
+IMAGE
+FILE
+VIDEO
+}
+
+// Group model to represent a chat group
+model Group {
+id          String         @id @default(uuid())
+name        String
+description String?
+isPrivate   Boolean        @default(false)
+slug        String         @unique
+inviteCode  String         @unique
+createdAt   DateTime       @default(now())
+updatedAt   DateTime       @updatedAt
+
+// Relations
+createdBy       User          @relation("UserCreatedGroups", fields: [createdByUserId], references: [id])
+createdByUserId String        @map("createdBy")
+
+members     GroupMember[]
+topics      Topic[]
+messages    Message[]
+}
+
+// GroupMember model to connect users to groups
+model GroupMember {
+id          String   @id @default(uuid())
+user        User     @relation(fields: [userId], references: [id])
+userId      String
+group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+groupId     String
+role        RoleEnum @default(MEMBER)
+permissions Json     @default("{}")
+joinedAt    DateTime @default(now())
+
+@@unique([userId, groupId])
+}
+
+// Topic model for group topics
+model Topic {
+id          String   @id @default(uuid())
+title       String
+group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+groupId     String
+createdBy   User     @relation(fields: [createdByUserId], references: [id])
+createdByUserId String @map("createdBy")
+createdAt   DateTime @default(now())
+}
+
+// Message model for chat messages
+model Message {
+id        String       @id @default(uuid())
+content   String?
+type      MessageType  @default(TEXT)
+mediaUrl  String?
+sender    User         @relation("UserMessages", fields: [senderId], references: [id])
+senderId  String
+group     Group        @relation(fields: [groupId], references: [id])
+groupId   String
+replyTo   Message?     @relation("ReplyMessages", fields: [replyToId], references: [id], onDelete: SetNull)
+replyToId String?
+createdAt DateTime     @default(now())
+updatedAt DateTime     @updatedAt
+deleted   Boolean      @default(false)
+
+replies   Message[]    @relation("ReplyMessages")
+reactions Reaction[]
+seenBy    MessageSeen[]
+}
+
+// Reaction model for message reactions
+model Reaction {
+id        String   @id @default(uuid())
+emoji     String
+user      User     @relation(fields: [userId], references: [id])
+userId    String
+message   Message  @relation(fields: [messageId], references: [id])
+messageId String
+createdAt DateTime @default(now())
+
+@@unique([userId, messageId, emoji])
+}
+
+// MessageSeen model to track seen messages
+model MessageSeen {
+id        String   @id @default(uuid())
+message   Message  @relation(fields: [messageId], references: [id])
+messageId String
+user      User     @relation(fields: [userId], references: [id])
+userId    String
+seenAt    DateTime @default(now())
+
+@@unique([userId, messageId])
 }
