@@ -1,3 +1,45 @@
+// Get all public groups (isPrivate: false)
+export const getPublicGroups = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const groups = await prisma.group.findMany({
+      where: { isPrivate: false },
+      include: {
+        createdBy: { select: { id: true, email: true, name: true } },
+        members: {
+          select: {
+            userId: true,
+            role: true,
+            permissions: true,
+            user: { select: { name: true, email: true } },
+          },
+        },
+        messages: { select: { id: true } },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    const transformed = groups.map(g => ({
+      id: g.id,
+      slug: g.slug,
+      inviteCode: g.inviteCode,
+      name: g.name,
+      description: g.description,
+      memberCount: g.members.length,
+      createdAt: g.createdAt,
+      lastMessageTime: g.updatedAt,
+      members: g.members.map(m => ({
+        userId: m.userId,
+        role: m.role,
+        permissions: m.permissions,
+        name: m.user?.name,
+        email: m.user?.email,
+      })),
+    }));
+    res.json(transformed);
+  } catch (err: any) {
+    console.error('Error getting public groups:', err);
+    res.status(500).json({ error: 'Failed to get public groups' });
+  }
+};
 import { RoleEnum } from '@prisma/client';
 import { Request, Response } from 'express';
 import { CREATOR_PERMISSIONS } from '../middlewares/group/permission';

@@ -1,9 +1,11 @@
+
 import express from 'express';
 import {
   createGroup,
   deleteGroup,
   getGroupById,
   getGroups,
+  getPublicGroups,
   joinGroup,
   leaveGroup,
   updateGroupById,
@@ -13,7 +15,15 @@ import { isCreator } from '../middlewares/group/permission';
 
 const router = express.Router();
 
+// Public groups (no auth required)
+
+// Public groups (no auth required)
+router.get('/public', getPublicGroups);
+
+// All routes below require authentication
 router.use(authenticate);
+
+
 
 /**
  * @swagger

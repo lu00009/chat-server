@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.ts",
     "build": "pnpm run clean && npx prisma generate && tsc",
-    "clean": "rm -rf dist node_modules/.prisma",
+    "clean": "rimraf dist node_modules/.prisma",
     "copy-prisma": "cp -r src/generated dist/generated",
     "start": "npx prisma migrate deploy && node dist/index.js",
     "prisma:generate": "npx prisma generate",

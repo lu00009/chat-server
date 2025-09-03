@@ -5,8 +5,10 @@ import { validatePassword } from '../middlewares/auth/validatePassword.middlewar
 
 const router = Router();
 
+
 router.post('/register', validatePassword, AuthController.register);
 router.post('/login', AuthController.login);
 router.get('/profile', authenticate, AuthController.profile);
+router.get('/users', authenticate, AuthController.getAllUsers);
 
 export default router;

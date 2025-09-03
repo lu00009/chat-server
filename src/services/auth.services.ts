@@ -4,6 +4,20 @@ import prisma from '../prisma/prisma';
 const SALT_ROUNDS = 12;
 
 export const AuthService = {
+  async getAllUsers() {
+    // Exclude sensitive fields
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    return users;
+  },
   async register(email: string, password: string, name: string) {
     // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
