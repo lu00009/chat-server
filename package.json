@@ -12,7 +12,8 @@
     "start": "npx prisma migrate deploy && node dist/index.js",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
-    "prisma:deploy": "npx prisma migrate deploy"
+    "prisma:deploy": "npx prisma migrate deploy",
+    "check-db": "npx ts-node check-db.ts"
   },
   "keywords": [],
   "author": "",
