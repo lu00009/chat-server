@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats'; // Assuming types/chats.ts is the correct path
 
-// Send a new message
+
 export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Response) => {
   const { content, senderId, groupId, type, replyToId } = req.body;
   const mediaUrl = req.file?.filename ? `/uploads/${req.file.filename}` : null;
@@ -24,7 +24,7 @@ export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Re
   }
 };
 
-// Get messages in a group
+
 export const getGroupMessages = async (req: Request, res: Response) => {
   const { groupId } = req.params;
 
