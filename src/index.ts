@@ -23,7 +23,19 @@ const io = new SocketIOServer(server, {
   perMessageDeflate: false
 });
 
+// ... existing code ...
+  perMessageDeflate: false
+});
+
+// Middleware to attach Socket.IO instance to each request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Socket middleware for authentication
+// ... existing code ...
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
