@@ -1,4 +1,3 @@
-
 import express from 'express';
 import {
   createGroup,
@@ -12,18 +11,25 @@ import {
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { isCreator } from '../middlewares/group/permission';
+import { upload } from '../middlewares/message/upload';
 
 const router = express.Router();
 
 // Public groups (no auth required)
-
-// Public groups (no auth required)
+/**
+ * @swagger
+ * /group/public:
+ *   get:
+ *     summary: Get list of public groups
+ *     tags: [Groups]
+ *     responses:
+ *       200:
+ *         description: List of public groups
+ */
 router.get('/public', getPublicGroups);
 
 // All routes below require authentication
 router.use(authenticate);
-
-
 
 /**
  * @swagger
@@ -50,8 +56,7 @@ router.use(authenticate);
  *       201:
  *         description: Group created
  */
-
-router.post('/create', createGroup);
+router.post('/create',upload.single("groupPicture"), createGroup);
 
 /**
  * @swagger
@@ -78,7 +83,6 @@ router.post('/create', createGroup);
  *       404:
  *         description: Group not found
  */
-
 router.post('/join', joinGroup);
 
 /**
@@ -99,7 +103,6 @@ router.post('/join', joinGroup);
  *       200:
  *         description: Group deleted
  */
-
 router.delete('/:groupId', isCreator, deleteGroup);
 
 /**
@@ -120,7 +123,6 @@ router.delete('/:groupId', isCreator, deleteGroup);
  *       200:
  *         description: Left group
  */
-
 router.post('/:groupId/leave', leaveGroup);
 
 /**
@@ -179,6 +181,6 @@ router.get('/:groupId', getGroupById);
  *       404:
  *         description: Group not found
  */
-router.patch('/:groupId', isCreator, updateGroupById); 
+router.patch('/:groupId', isCreator, upload.single("file"), updateGroupById);
 
 export default router;

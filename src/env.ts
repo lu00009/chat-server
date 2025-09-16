@@ -24,7 +24,10 @@ export const env = {
   // Socket.IO specific
   SOCKET_PATH: process.env.SOCKET_PATH || '/socket.io/',
   SOCKET_PING_TIMEOUT: process.env.SOCKET_PING_TIMEOUT ? Number(process.env.SOCKET_PING_TIMEOUT) : 60000,
-  SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL ? Number(process.env.SOCKET_PING_INTERVAL) : 25000
+  SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL ? Number(process.env.SOCKET_PING_INTERVAL) : 25000,
+
+  // Swagger docs path
+  SWAGGER_PATH: process.env.SWAGGER_PATH || '/api-docs',
 } as const;
 
 // Type for environment variables

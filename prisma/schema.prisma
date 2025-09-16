@@ -45,6 +45,7 @@ VIDEO
 model Group {
 id          String         @id @default(uuid())
 name        String
+group_picture String?
 description String?
 isPrivate   Boolean        @default(false)
 slug        String         @unique
@@ -84,6 +85,8 @@ groupId     String
 createdBy   User     @relation(fields: [createdByUserId], references: [id])
 createdByUserId String @map("createdBy")
 createdAt   DateTime @default(now())
+
+messages    Message[]
 }
 
 // Message model for chat messages
@@ -92,10 +95,14 @@ id        String       @id @default(uuid())
 content   String?
 type      MessageType  @default(TEXT)
 mediaUrl  String?
+mediaPublicId String?
+mediaResourceType String?
 sender    User         @relation("UserMessages", fields: [senderId], references: [id])
 senderId  String
 group     Group        @relation(fields: [groupId], references: [id])
 groupId   String
+topic     Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+topicId   String?
 replyTo   Message?     @relation("ReplyMessages", fields: [replyToId], references: [id], onDelete: SetNull)
 replyToId String?
 createdAt DateTime     @default(now())

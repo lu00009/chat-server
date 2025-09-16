@@ -1,5 +1,6 @@
 // src/swagger/swaggerOptions.ts
 import { Options } from "swagger-jsdoc";
+import { env } from "../env";
 
 export const swaggerOptions: Options = {
   swaggerDefinition: {
@@ -11,7 +12,7 @@ export const swaggerOptions: Options = {
     },
     servers: [
       {
-        url: "http://localhost:3002",
+        url: `http://localhost:${env.PORT}`,
         description: "Development server",
       },
     ],

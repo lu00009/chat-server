@@ -1,5 +1,6 @@
-// Get all public groups (isPrivate: false)
-export const getPublicGroups = async (req: Request, res: Response): Promise<void> => {
+const cloudinaryModule: any = require('../config/cloudinary');
+const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+import fs from 'fs/promises';export const getPublicGroups = async (req: Request, res: Response): Promise<void> => {
   try {
     const groups = await prisma.group.findMany({
       where: { isPrivate: false },
@@ -46,11 +47,13 @@ import { CREATOR_PERMISSIONS } from '../middlewares/group/permission';
 import prisma from '../prisma/prisma';
 import type { } from '../types/express';
 import { generateInviteCode, randomSuffix, slugify } from '../utils/slugify';
+import { group } from 'console';
 
 // Create group: creator is assigned automatically as CREATOR with full rights
 export const createGroup = async (req: Request, res: Response): Promise<void> => {
   const { name, description, isPrivate } = req.body;
   const userId = req.user?.id;
+  let groupPictureUrl: string | undefined = req.body.group_picture;
 
   try {
     if (!userId) {
@@ -69,11 +72,24 @@ export const createGroup = async (req: Request, res: Response): Promise<void> =>
       if (attempt > 5) break;
     }
     const inviteCode = generateInviteCode();
-
+      if (req.file) {
+              try {
+                const uploadResult: any = await cloudinaryUploader.upload(req.file.path, {
+                  resource_type: 'auto',
+                  folder: 'group_pictures',
+                });
+                groupPictureUrl = uploadResult.secure_url;
+                // remove local file
+                await fs.unlink(req.file.path).catch(() => {});
+              } catch (err: any) {
+                console.warn('Cloudinary upload failed:', err.message || err);
+              }
+            }
     // Create the group and the creator's membership.
     const group = await prisma.group.create({
-      data: {
+    data: {
         name,
+        group_picture: groupPictureUrl,
         description,
         isPrivate: !!isPrivate,
         slug: slugCandidate,
@@ -346,6 +362,7 @@ export const getGroups = async (req: Request, res: Response): Promise<void> => {
         slug: g.slug,
         inviteCode: g.inviteCode,
         name: g.name,
+        group_picture: g.group_picture,
         description: g.description,
         memberCount: g.members.length,
         isAdmin,
@@ -367,11 +384,39 @@ export const getGroups = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+
 // Update a group by ID
 export const updateGroupById = async (req: Request, res: Response): Promise<void> => {
   const { groupId } = req.params;
   const { name, description, isPrivate } = req.body;
   const userId = req.user?.id;
+
+  const dataToUpdate: {
+    name?: string;
+    description?: string;
+    isPrivate?: boolean;
+    group_picture?: string;
+  } = {};
+
+  if (name) dataToUpdate.name = name;
+  if (description) dataToUpdate.description = description;
+  if (isPrivate !== undefined) dataToUpdate.isPrivate = !!isPrivate;
+
+  if (req.file) {
+    try {
+      const uploadResult: any = await cloudinaryUploader.upload(req.file.path, {
+        resource_type: 'auto',
+        folder: 'group_pictures',
+      });
+      dataToUpdate.group_picture = uploadResult.secure_url;
+      // remove local file
+      await fs.unlink(req.file.path).catch(() => {});
+    } catch (err: any) {
+      console.warn('Cloudinary upload failed:', err.message || err);
+    }
+  } else if (req.body.group_picture) {
+    dataToUpdate.group_picture = req.body.group_picture;
+  }
 
   try {
     const groupToUpdate = await prisma.group.findUnique({
@@ -391,11 +436,7 @@ export const updateGroupById = async (req: Request, res: Response): Promise<void
 
     const updatedGroup = await prisma.group.update({
       where: { id: groupId },
-      data: {
-        name,
-        description,
-        isPrivate: !!isPrivate,
-      },
+      data: dataToUpdate,
       include: {
         createdBy: { select: { id: true, email: true, name: true } }, // Corrected from 'creator'
         members: {
