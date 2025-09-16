@@ -16,6 +16,9 @@ id              String         @id @default(uuid())
 email           String         @unique
 password        String
 name            String?
+isVerified      Boolean        @default(false)
+verificationToken String?      @unique
+verificationTokenExpiry DateTime?
 createdAt       DateTime       @default(now())
 updatedAt       DateTime       @updatedAt
 groupsCreated   Group[]        @relation("UserCreatedGroups")

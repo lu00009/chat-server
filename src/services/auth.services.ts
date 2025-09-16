@@ -1,5 +1,7 @@
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import prisma from '../prisma/prisma';
+import { sendVerificationEmail } from '../utils/mail';
 
 const SALT_ROUNDS = 12;
 
@@ -13,11 +15,13 @@ export const AuthService = {
         email: true,
         createdAt: true,
         updatedAt: true,
+        isVerified: true,
       },
       orderBy: { name: 'asc' },
     });
     return users;
   },
+
   async register(email: string, password: string, name: string) {
     // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -27,20 +31,36 @@ export const AuthService = {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24); // 24 hours from now
+    
     try {
-      const user = await prisma.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          name,
-        },
-      });
+          const user = await prisma.user.create({
+            data: {
+              email,
+              password: hashedPassword,
+              name,
+              verificationToken,
+              verificationTokenExpiry: tokenExpiry,
+              isVerified: false
+            }
+          });
+      
+      // Send verification email
+      await sendVerificationEmail(
+        email,
+        verificationToken,
+        name || email
+      );
       
       // Return user without sensitive data
       return {
         id: user.id,
         email: user.email,
         name: user.name,
+        isVerified: user.isVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       };
@@ -76,7 +96,10 @@ export const AuthService = {
         id: true,
         email: true,
         password: true,
-        name: true
+        name: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
 
@@ -89,12 +112,108 @@ export const AuthService = {
       throw new Error('Invalid credentials');
     }
 
+    // Check if user is verified
+    if (!user.isVerified) {
+      throw new Error('Please verify your email before logging in');
+    }
+
     // Return user without sensitive data
     return {
       id: user.id,
       email: user.email,
-      name: user.name
+      name: user.name,
+      isVerified: user.isVerified
     };
+  },
+
+  async verifyEmail(token: string) {
+    // Find user with the verification token
+    const user = await prisma.user.findFirst({
+      where: {
+        verificationToken: token,
+        verificationTokenExpiry: {
+          gte: new Date() // Token not expired
+        }
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!user) {
+      throw new Error('Invalid or expired verification token');
+    }
+
+    // Update user as verified and clear token
+        const updatedUser = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            isVerified: true,
+            verificationToken: null,
+            verificationTokenExpiry: null
+          }
+        });
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      isVerified: updatedUser.isVerified
+    };
+  },
+
+  async resendVerificationEmail(email: string) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (user.isVerified) {
+      throw new Error('Email is already verified');
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24); // 24 hours from now
+
+    // Update user with new token
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            verificationToken,
+            verificationTokenExpiry: tokenExpiry
+          }
+        });
+
+    // Send verification email
+    const emailSent = await sendVerificationEmail(
+      email,
+      verificationToken,
+      user.name || email
+    );
+
+    if (!emailSent) {
+      throw new Error('Failed to send verification email');
+    }
+
+    return { success: true, message: 'Verification email sent' };
   },
 
   async getProfile(userId: string) {
@@ -104,14 +223,17 @@ export const AuthService = {
         id: true,
         email: true,
         name: true,
+        isVerified: true,
         createdAt: true,
         updatedAt: true,
+        // Include other relevant fields but exclude sensitive data
       }
     });
-    
+
     if (!user) {
       throw new Error('User not found');
     }
+
     return user;
   }
 };

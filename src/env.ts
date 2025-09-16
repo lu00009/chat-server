@@ -7,7 +7,7 @@ dotenv.config({
 });
 
 // Environment configuration with type safety
-export const env = {
+export const config = {
   // Server configuration
   PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -17,15 +17,28 @@ export const env = {
   
   // Authentication
   JWT_SECRET: process.env.JWT_SECRET || 'default-secret-for-dev',
+  VERIFICATION_TOKEN_EXPIRY: process.env.VERIFICATION_TOKEN_EXPIRY || '24h',
   
   // Client/API configuration
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
   
   // Socket.IO specific
   SOCKET_PATH: process.env.SOCKET_PATH || '/socket.io/',
   SOCKET_PING_TIMEOUT: process.env.SOCKET_PING_TIMEOUT ? Number(process.env.SOCKET_PING_TIMEOUT) : 60000,
-  SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL ? Number(process.env.SOCKET_PING_INTERVAL) : 25000
+  SOCKET_PING_INTERVAL: process.env.SOCKET_PING_INTERVAL ? Number(process.env.SOCKET_PING_INTERVAL) : 25000,
+
+  // Email configuration
+  MAIL_HOST: process.env.MAIL_HOST || 'smtp.gmail.com',
+  MAIL_PORT: process.env.MAIL_PORT || '587',
+  MAIL_USER: process.env.MAIL_USER || '',
+  MAIL_PASSWORD: process.env.MAIL_PASSWORD || '',
+  MAIL_FROM: process.env.MAIL_FROM || '',
+  MAIL_SECURE: process.env.MAIL_SECURE || 'false'
 } as const;
+
+// For backward compatibility
+export const env = config;
 
 // Type for environment variables
 export type EnvConfig = typeof env;

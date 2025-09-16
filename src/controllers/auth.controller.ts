@@ -79,4 +79,30 @@ export const AuthController = {
       });
     }
   },
+  async verifyEmail(req: Request, res: Response) {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ error: 'Verification token required' });
+      }
+      const user = await AuthService.verifyEmail(token);
+      return res.json({ message: 'Email verified successfully', user });
+    } catch (error: any) {
+      console.error('Email verification error:', error);
+      return res.status(400).json({ error: error.message || 'Email verification failed' });
+    }
+  },
+  async resendVerificationEmail(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: 'Email required' });
+      }
+      const result = await AuthService.resendVerificationEmail(email);
+      return res.json(result);
+    } catch (error: any) {
+      console.error('Resend verification error:', error);
+      return res.status(400).json({ error: error.message || 'Resend verification failed' });
+    }
+  },
 };
