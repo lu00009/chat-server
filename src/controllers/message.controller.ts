@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats'; // Assuming types/chats.ts is the correct path
+// Import cloudinary in a way that works with both ESModule and CommonJS consumers
+const cloudinaryModule: any = require('../config/cloudinary');
+const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+import fs from 'fs/promises';
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
 function normalizeMessageType(raw?: string) {
@@ -13,26 +17,51 @@ function normalizeMessageType(raw?: string) {
 // Send a new message
 export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Response) => {
   const { content, senderId: bodySenderId, groupId, type, replyToId } = req.body;
-  const mediaUrl = req.file?.filename ? `/uploads/${req.file.filename}` : null;
+  let mediaUrl = req.file?.filename ? `/uploads/${req.file.filename}` : null;
+  let mediaPublicId: string | null = null;
+  let mediaResourceType: string | null = null;
   const authUserId = (req as any).user?.id;
   const finalSenderId = authUserId || bodySenderId; // prefer authenticated user
   try {
     if (!finalSenderId) {
-      return res.status(400).json({ error: 'Missing senderId (auth required)' });
+      res.status(400).json({ error: 'Missing senderId (auth required)' });
+      return;
     }
     if (!groupId) {
-      return res.status(400).json({ error: 'Missing groupId' });
+      res.status(400).json({ error: 'Missing groupId' });
+      return;
     }
 
     // (Optional) Validate membership
-    const membership = await prisma.groupMember.findUnique({
-      where: { userId_groupId: { userId: finalSenderId, groupId } },
+    const membership = await prisma.groupMember.findMany({
+      where: { userId: finalSenderId, groupId },
     });
-    if (!membership) {
-      return res.status(403).json({ error: 'Not a member of this group' });
+    if (!membership || membership.length === 0) {
+      console.log('User not a member of group:', finalSenderId, groupId);
+      res.status(403).json({ error: 'Not a member of this group' });
+      return;
+    }
+
+    // If a file was uploaded by multer, upload to Cloudinary and remove local file
+    if (req.file) {
+      try {
+        const uploadResult: any = await cloudinaryUploader.upload(req.file.path, {
+          resource_type: 'auto',
+          folder: 'chat_messages',
+        });
+        mediaUrl = uploadResult.secure_url || mediaUrl;
+        mediaPublicId = uploadResult.public_id;
+        mediaResourceType = uploadResult.resource_type;
+        // remove local file
+        await fs.unlink(req.file.path).catch(() => {});
+      } catch (err: any) {
+        console.warn('Cloudinary upload failed:', err.message || err);
+      }
     }
 
     const normalizedType = normalizeMessageType(type);
+    // Cast `data` to `any` as a short-term workaround so TypeScript doesn't fail
+    // until you run `npx prisma generate` after migrating the schema.
     const message = await prisma.message.create({
       data: {
         content: content ?? '',
@@ -41,7 +70,9 @@ export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Re
         type: normalizedType as any,
         replyToId,
         mediaUrl,
-      },
+        mediaPublicId,
+        mediaResourceType,
+      } as any,
       include: { sender: { select: { id: true, name: true, email: true } }, reactions: true, seenBy: true }
     });
 
@@ -84,7 +115,7 @@ export const updateMessage = async (req: Request<{messageId: string}, {}, Update
       where: { id: messageId },
       data: { content: newContent },
     });
-
+    
     res.json(message);
   } catch (error:any) {
     console.error('updateMessage error:', error);
@@ -97,9 +128,8 @@ export const deleteMessage = async (req: Request<{messageId: string}>, res: Resp
   const { messageId } = req.params;
 
   try {
-    const message = await prisma.message.update({
+    const message = await prisma.message.delete({
       where: { id: messageId },
-      data: { deleted: true },
     });
 
     res.json({ message: "Deleted successfully" });
@@ -117,7 +147,10 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
   const userId = authUserId || bodyUserId;
 
   try {
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    if (!userId) {
+      res.status(400).json({ error: 'Missing userId' });
+      return;
+    }
     const reaction = await prisma.reaction.upsert({
       where: {
         userId_messageId_emoji: { userId, messageId, emoji },
@@ -155,8 +188,11 @@ export const removeReaction = async (req: Request<{messageId: string, emoji: str
 // Mark as seen
 export const markMessageSeen = async (req: Request<{messageId: string}, {}, SeenBody>, res: Response) => {
   const { messageId } = req.params;
-  const { userId } = req.body;
-
+  const userId = req.user?.id;
+if (!userId) {
+  res.status(400).json({ error: 'Missing userId (auth required)' });
+  return;
+}
   try {
     const seen = await prisma.messageSeen.upsert({
       where: { userId_messageId: { userId, messageId } },

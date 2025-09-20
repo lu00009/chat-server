@@ -58,7 +58,7 @@ router.get('/:groupId/topics', getTopics);
 
 /**
  * @swagger
- * /group/{groupId}/topics/{topicId}:
+ * /group/{groupId}/{topicId}:
  *   patch:
  *     summary: Update a topic in a group
  *     tags: [Topics]

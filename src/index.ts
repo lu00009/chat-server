@@ -14,16 +14,24 @@ const io = new SocketIOServer(server, {
     credentials: true
   },
   path: env.SOCKET_PATH,
-  transports: ["websocket"],
+  transports: ["polling", "websocket"],
   allowEIO3: true,
   connectTimeout: parseInt(process.env.WS_PING_TIMEOUT || "60000"),
   pingTimeout: parseInt(process.env.WS_PING_TIMEOUT || "60000"),
   pingInterval: parseInt(process.env.WS_PING_INTERVAL || "25000"),
-  allowUpgrades: false,
+  allowUpgrades: true,
   perMessageDeflate: false
 });
 
+// Middleware to attach Socket.IO instance to each request
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Socket middleware for authentication
+// ... existing code ...
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;

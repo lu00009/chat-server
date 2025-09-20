@@ -23,7 +23,7 @@ export const CREATOR_PERMISSIONS = {
 export const DEFAULT_MEMBER_PERMISSIONS = {
   sendMessage: true,
   uploadFiles: true,
-  createTopics: false,
+  createTopics: true,
   inviteMembers: true,
   viewMembers: true,
   manageMembers: false,

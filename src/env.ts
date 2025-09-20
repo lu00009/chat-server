@@ -35,6 +35,9 @@ export const config = {
   MAIL_PASSWORD: process.env.MAIL_PASSWORD || '',
   MAIL_FROM: process.env.MAIL_FROM || '',
   MAIL_SECURE: process.env.MAIL_SECURE || 'false'
+  ,
+  // Swagger UI path
+  SWAGGER_PATH: process.env.SWAGGER_PATH || '/api-docs'
 } as const;
 
 // For backward compatibility

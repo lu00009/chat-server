@@ -15,14 +15,14 @@ export const createTopic = async (req: Request, res: Response): Promise<void> =>
       where: { userId_groupId: { userId, groupId } },
     });
     if (!member) {
-      res.status(404).json({ error: 'You are not a member of this group' });
+      res.status(403).json({ error: 'You are not a member of this group or your membership is not active.' });
       return;
     }
-    const permissions = member.permissions as any;
-    if (!permissions.manageTopics) {
-      res.status(403).json({ error: 'You do not have permission to manage topics' });
-      return;
-    }
+      const permissions = member.permissions as any;
+      if (!permissions.createTopics) {
+        res.status(403).json({ error: 'You do not have permission to create topics' });
+        return;
+      }
     const topic = await prisma.topic.create({
       data: {
         title,

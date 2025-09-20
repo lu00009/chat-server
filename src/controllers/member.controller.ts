@@ -37,7 +37,8 @@ export const addMember = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Error adding member:", err);
     if (err.code === 'P2002') {
-      return res.status(409).json({ error: 'User is already a member of this group.' });
+      res.status(409).json({ error: 'User is already a member of this group.' });
+      return;
     }
     res.status(500).json({ error: 'Failed to add member' });
   }
@@ -97,7 +98,8 @@ export const updateMemberRole = async (req: Request, res: Response) => {
   const { role } = req.body;
 
   if (!Object.values(RoleEnum).includes(role as RoleEnum)) {
-    return res.status(400).json({ error: `Invalid role specified. Must be one of: ${Object.values(RoleEnum).join(', ')}` });
+    res.status(400).json({ error: `Invalid role specified. Must be one of: ${Object.values(RoleEnum).join(', ')}` });
+    return;
   }
   
   const currentUserId = req.user?.id;
@@ -233,5 +235,57 @@ export const getGroupMembers = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error fetching group members:', err);
     res.status(500).json({ error: 'Failed to fetch group members' });
+  }
+};
+
+// Update member permissions
+export const updateMemberPermissions = async (req: Request, res: Response): Promise<void> => {
+  const { groupId, userId } = req.params;
+  const { permissions } = req.body;
+  const currentUserId = req.user?.id;
+
+  try {
+    // Ensure the user making the request has permission to manage permissions
+    const currentUserMember = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId: currentUserId!, groupId } },
+    });
+
+    if (!currentUserMember || !(currentUserMember.permissions as any)?.managePermissions) {
+      res.status(403).json({ error: 'You do not have permission to manage permissions for this group.' });
+      return;
+    }
+
+    const memberToUpdate = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId, groupId } },
+    });
+
+    if (!memberToUpdate) {
+      res.status(404).json({ error: 'Member not found in this group' });
+      return;
+    }
+
+    if (memberToUpdate.role === RoleEnum.CREATOR) {
+      res.status(403).json({ error: "Cannot change the creator's permissions" });
+      return;
+    }
+
+    // Merge new permissions with existing ones
+    const existingPermissions =
+      typeof memberToUpdate.permissions === 'object' &&
+      memberToUpdate.permissions !== null &&
+      !Array.isArray(memberToUpdate.permissions)
+        ? memberToUpdate.permissions
+        : {};
+    const newPermissions = { ...existingPermissions, ...permissions };
+
+    const updatedMember = await prisma.groupMember.update({
+      where: { userId_groupId: { userId, groupId } },
+      data: { permissions: newPermissions },
+    });
+
+    res.json(updatedMember);
+  } catch (err: any) {
+    console.error("Error updating member permissions:", err);
+    res.status(500).json({ error: 'Failed to update member permissions' });
   }
 };
