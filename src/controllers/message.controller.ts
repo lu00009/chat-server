@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
-import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats'; // Assuming types/chats.ts is the correct path
+import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
+import { getIO } from '../socket/io'; // Import the global getIO function
 // Import cloudinary in a way that works with both ESModule and CommonJS consumers
-const cloudinaryModule: any = require('../config/cloudinary');
-const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+  const cloudinaryModule: any = require('../config/cloudinary');
+  const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 import fs from 'fs/promises';
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
@@ -17,11 +18,13 @@ function normalizeMessageType(raw?: string) {
 // Send a new message
 export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Response) => {
   const { content, senderId: bodySenderId, groupId, type, replyToId } = req.body;
-  let mediaUrl = req.file?.filename ? `/uploads/${req.file.filename}` : null;
+  const authUserId = (req as any).user?.id;
+  const finalSenderId = authUserId || bodySenderId;
+
+  let mediaUrl: string | null = null;
   let mediaPublicId: string | null = null;
   let mediaResourceType: string | null = null;
-  const authUserId = (req as any).user?.id;
-  const finalSenderId = authUserId || bodySenderId; // prefer authenticated user
+
   try {
     if (!finalSenderId) {
       res.status(400).json({ error: 'Missing senderId (auth required)' });
@@ -32,54 +35,69 @@ export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Re
       return;
     }
 
-    // (Optional) Validate membership
-    const membership = await prisma.groupMember.findMany({
-      where: { userId: finalSenderId, groupId },
+    // Validate membership (use findUnique on composite key if available)
+    const membership = await prisma.groupMember.findUnique({
+      where: { userId_groupId: { userId: finalSenderId, groupId } }
     });
-    if (!membership || membership.length === 0) {
-      console.log('User not a member of group:', finalSenderId, groupId);
+    if (!membership) {
       res.status(403).json({ error: 'Not a member of this group' });
       return;
     }
 
-    // If a file was uploaded by multer, upload to Cloudinary and remove local file
     if (req.file) {
       try {
         const uploadResult: any = await cloudinaryUploader.upload(req.file.path, {
           resource_type: 'auto',
-          folder: 'chat_messages',
+            folder: 'chat_messages',
         });
-        mediaUrl = uploadResult.secure_url || mediaUrl;
-        mediaPublicId = uploadResult.public_id;
-        mediaResourceType = uploadResult.resource_type;
-        // remove local file
+        mediaUrl = uploadResult.secure_url || null;
+        mediaPublicId = uploadResult.public_id || null;
+        mediaResourceType = uploadResult.resource_type || null;
         await fs.unlink(req.file.path).catch(() => {});
       } catch (err: any) {
         console.warn('Cloudinary upload failed:', err.message || err);
       }
     }
 
-    const normalizedType = normalizeMessageType(type);
-    // Cast `data` to `any` as a short-term workaround so TypeScript doesn't fail
-    // until you run `npx prisma generate` after migrating the schema.
+    // Determine final message type
+    let normalizedType = normalizeMessageType(type);
+    if (mediaUrl) {
+      if (mediaResourceType === 'image') normalizedType = 'IMAGE';
+      else if (mediaResourceType === 'video') normalizedType = 'VIDEO';
+      else normalizedType = 'FILE';
+    }
+
     const message = await prisma.message.create({
       data: {
-        content: content ?? '',
+        content: (content ?? '').trim(),
         senderId: finalSenderId,
         groupId,
         type: normalizedType as any,
-        replyToId,
+        replyToId: replyToId || null,
         mediaUrl,
         mediaPublicId,
         mediaResourceType,
       } as any,
-      include: { sender: { select: { id: true, name: true, email: true } }, reactions: true, seenBy: true }
+      include: {
+        sender: { select: { id: true, name: true, email: true } },
+        reactions: true,
+        seenBy: true,
+      }
     });
+
+    // Emit real-time event to group room (both text & file messages)
+    // Replaced req.io usage with global getIO()
+    const io = getIO();
+    if (io) {
+      io.to(groupId).emit('message_received', message);
+    } else {
+      console.warn('Socket.IO global instance not set');
+    }
 
     res.status(201).json(message);
   } catch (error: any) {
     console.error('sendMessage error:', error);
-    res.status(500).json({ error: "Could not send message", details: error.message });
+    res.status(500).json({ error: 'Could not send message', details: error.message });
   }
 };
 

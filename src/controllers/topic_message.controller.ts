@@ -3,6 +3,9 @@ import prisma from '../prisma/prisma';
 import type { } from '../types/express';
 import fs from 'fs/promises';
 import { SendMessageBody } from '../types/chats';
+import { getIO } from '../socket/io';
+
+
 const cloudinaryModule: any = require('../config/cloudinary');
 const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 
@@ -75,11 +78,13 @@ export const sendMessageInTopic = async (req: Request, res: Response) => {
       },
     });
 
-    // Emit the new message to the topic's room using Socket.IO
-    if (req.io) {
-      req.io.to(topicId).emit('message_received', message);
+    // Emit the new message to topic & group rooms
+    const io = getIO();
+    if (io) {
+      io.to(topicId).emit('topic_message_received', message); // topic specific
+      io.to(groupId).emit('message_received', message);       // group feed fallback
     } else {
-      console.warn('Socket.IO instance not found on request object.');
+      console.warn('Socket.IO global instance not set');
     }
 
     res.status(201).json(message);

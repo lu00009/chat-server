@@ -4,6 +4,7 @@ import app from './app';
 import { env } from './env';
 import prisma from './prisma/prisma';
 import { verifyToken } from './utils/auth.utils';
+import { setIO } from './socket/io'; // <-- added
 
 const server = http.createServer(app);
 
@@ -23,6 +24,9 @@ const io = new SocketIOServer(server, {
   perMessageDeflate: false
 });
 
+// Register global instance so controllers can access it via getIO()
+setIO(io);
+
 // Middleware to attach Socket.IO instance to each request
 app.use((req, res, next) => {
   req.io = io;
@@ -30,8 +34,6 @@ app.use((req, res, next) => {
 });
 
 // Socket middleware for authentication
-// ... existing code ...
-
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
@@ -150,6 +152,6 @@ io.of("/").on("connection", (socket) => {
 });
 
 server.listen(env.PORT, () => {
-  console.log(`Server running on port ${env.PORT}`);
+  console.log(`Server running on port http://localhost:${env.PORT}`);
   console.log(`WebSocket endpoint: ws://localhost:${env.PORT}${env.SOCKET_PATH}`);
 });
