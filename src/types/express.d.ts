@@ -7,6 +7,7 @@ declare global {
         id: string;
         name: string | null;
       };
+      cookies?: Record<string, string>;
       file?: Express.Multer.File;
       files?: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[];
       io?: Server;

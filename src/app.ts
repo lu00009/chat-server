@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import "reflect-metadata";
@@ -5,8 +6,8 @@ import { upload } from './middlewares/message/upload';
 import authRoutes from './routes/auth.routes';
 import groupRoutes from './routes/group.routes';
 import memberRoutes from './routes/member.routes';
-import topicMessageRoutes from './routes/topic_message.routes';
 import topicRoutes from './routes/topic.routes';
+import topicMessageRoutes from './routes/topic_message.routes';
 
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from 'swagger-ui-express';
@@ -17,7 +18,11 @@ import { swaggerOptions } from "./swagger/swaggerOptions";
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  credentials: true,
+}));
 
 const specs = swaggerJsdoc(swaggerOptions);
 app.use(env.SWAGGER_PATH, swaggerUi.serve, swaggerUi.setup(specs));

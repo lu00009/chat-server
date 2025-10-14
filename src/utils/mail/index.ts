@@ -18,7 +18,7 @@ export const sendVerificationEmail = async (
   token: string,
   username: string
 ): Promise<boolean> => {
-  const verificationUrl = `${config.FRONTEND_URL}/verify-email?token=${token}`;
+  const verificationUrl = `${config.FRONTEND_URL}/verify?token=${token}`;
 
   try {
     const mailOptions = {

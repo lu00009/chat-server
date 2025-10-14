@@ -18,6 +18,7 @@ export const config = {
   // Authentication
   JWT_SECRET: process.env.JWT_SECRET || 'default-secret-for-dev',
   VERIFICATION_TOKEN_EXPIRY: process.env.VERIFICATION_TOKEN_EXPIRY || '24h',
+  REFRESH_TTL_DAYS: process.env.REFRESH_TTL_DAYS || '30',
   
   // Client/API configuration
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',

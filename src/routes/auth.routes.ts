@@ -64,6 +64,8 @@ router.post('/register', validatePassword, AuthController.register);
 router.post('/login', AuthController.login);
 router.post('/verify-email', AuthController.verifyEmail);
 router.post('/resend-verification', AuthController.resendVerificationEmail);
+router.post('/refresh', AuthController.refresh);
+router.post('/logout', AuthController.logout);
 
 /**
  * @swagger

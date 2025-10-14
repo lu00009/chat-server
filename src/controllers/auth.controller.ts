@@ -1,6 +1,13 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.services';
-import { generateToken } from '../utils/auth.utils';
+import {
+    clearRefreshTokenCookie,
+    createRefreshToken,
+    generateToken,
+    revokeRefreshToken,
+    rotateRefreshToken,
+    setRefreshTokenCookie,
+} from '../utils/auth.utils';
 
 export const AuthController = {
   async getAllUsers(req: Request, res: Response) {
@@ -51,13 +58,15 @@ export const AuthController = {
       }
 
       const user = await AuthService.login(email, password);
-      const token = generateToken(user.id);
-
-      res.json({
-        user,
-        token,
-        expiresIn: '1h',
+      const accessToken = generateToken(user.id, '15m');
+      const { token: refreshToken, expiresAt } = await createRefreshToken({
+        userId: user.id,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'] || undefined,
       });
+      setRefreshTokenCookie(res, refreshToken, expiresAt);
+
+      res.json({ user, token: accessToken, expiresIn: '15m' });
     } catch (error: any) {
       console.error('Login error:', error);
       res.status(401).json({
@@ -106,6 +115,40 @@ export const AuthController = {
     } catch (error: any) {
       console.error('Resend verification error:', error);
       return res.status(400).json({ error: error.message || 'Resend verification failed' });
+    }
+  },
+  async refresh(req: Request, res: Response) {
+    try {
+      const token = req.cookies?.refresh_token as string | undefined;
+      if (!token) {
+        res.status(401).json({ error: 'Refresh token missing' });
+        return;
+      }
+      const rotated = await rotateRefreshToken(token, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      const accessToken = generateToken(rotated.userId, '15m');
+      setRefreshTokenCookie(res, rotated.token, rotated.expiresAt);
+      res.json({ token: accessToken, expiresIn: '15m' });
+    } catch (error: any) {
+      console.error('Refresh error:', error);
+      clearRefreshTokenCookie(res);
+      res.status(401).json({ error: error.message || 'Refresh failed' });
+    }
+  },
+
+  async logout(req: Request, res: Response) {
+    try {
+      const token = req.cookies?.refresh_token as string | undefined;
+      if (token) {
+        await revokeRefreshToken(token);
+      }
+      clearRefreshTokenCookie(res);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      res.status(400).json({ error: error.message || 'Logout failed' });
     }
   },
 };

@@ -27,6 +27,7 @@ model User {
   messagesSent            Message[]     @relation("UserMessages")
   reactions               Reaction[]
   messagesSeen            MessageSeen[]
+  refreshTokens           RefreshToken[]
 }
 
 // Enum for user roles within a group
@@ -140,4 +141,20 @@ model MessageSeen {
   seenAt    DateTime @default(now())
 
   @@unique([userId, messageId])
+}
+
+// Refresh tokens for session management with rotation
+model RefreshToken {
+  id              String   @id @default(uuid())
+  tokenHash       String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  revokedAt       DateTime?
+  replacedByToken String?
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  ip              String?
+  userAgent       String?
+
+  @@index([userId])
 }
