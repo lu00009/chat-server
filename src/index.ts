@@ -3,8 +3,10 @@ import { Server as SocketIOServer } from 'socket.io';
 import app from './app';
 import { env } from './env';
 import prisma from './prisma/prisma';
-import { verifyToken } from './utils/auth.utils';
+import { updateUserLastSeen } from './services/presence.service';
 import { setIO } from './socket/io'; // <-- added
+import { userConnected, userDisconnected } from './socket/presence';
+import { verifyToken } from './utils/auth.utils';
 
 const server = http.createServer(app);
 
@@ -66,6 +68,8 @@ io.use(async (socket, next) => {
 // Root namespace handler
 io.of("/").on("connection", (socket) => {
   console.log(`New connection: ${socket.id}, User: ${socket.data.user.name}`);
+  // mark user online
+  try { userConnected(socket.data.user.id); } catch {}
 
   // Join a group room
   socket.on("join_group", async (groupId: string, callback) => {
@@ -148,6 +152,14 @@ io.of("/").on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`${socket.id} (${socket.data.user?.name || 'Unknown'}) disconnected`);
+    try {
+      const uid = socket.data.user?.id;
+      if (uid) {
+        userDisconnected(uid);
+        // Update last seen timestamp
+        updateUserLastSeen(uid);
+      }
+    } catch {}
   });
 });
 

@@ -16,6 +16,10 @@ model User {
   email                   String        @unique
   password                String
   name                    String?
+  bio                     String?
+  status                  String?
+  profilePicture          String?
+  lastSeen                DateTime?
   isVerified              Boolean       @default(false)
   verificationToken       String?       @unique
   verificationTokenExpiry DateTime?

@@ -91,6 +91,32 @@ export const AuthController = {
       });
     }
   },
+  
+  async updateProfile(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const { name, bio, status, profilePicture } = req.body as {
+        name?: string;
+        bio?: string;
+        status?: string;
+        profilePicture?: string;
+      };
+
+      const updated = await AuthService.updateProfile(req.user.id, {
+        name,
+        bio,
+        status,
+        profilePicture,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      res.status(400).json({ error: error.message || 'Failed to update profile' });
+    }
+  },
   async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.body;
