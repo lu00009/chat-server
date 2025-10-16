@@ -227,6 +227,7 @@ export const getGroupMembers = async (req: Request, res: Response) => {
             id: true,
             email: true,
             name: true,
+            profilePicture: true,
           },
         },
       },

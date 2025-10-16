@@ -6,6 +6,24 @@ import { sendVerificationEmail } from '../utils/mail';
 const SALT_ROUNDS = 12;
 
 export const AuthService = {
+  async getUserPublic(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        bio: true,
+        profilePicture: true,
+        status: true,
+        lastSeen: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return user;
+  },
   async getAllUsers() {
     // Exclude sensitive fields
     const users = await prisma.user.findMany({
@@ -13,6 +31,9 @@ export const AuthService = {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
+        status: true,
+        lastSeen: true,
         createdAt: true,
         updatedAt: true,
         isVerified: true,

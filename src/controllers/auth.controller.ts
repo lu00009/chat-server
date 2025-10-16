@@ -1,15 +1,33 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.services';
 import {
-    clearRefreshTokenCookie,
-    createRefreshToken,
-    generateToken,
-    revokeRefreshToken,
-    rotateRefreshToken,
-    setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+  createRefreshToken,
+  generateToken,
+  revokeRefreshToken,
+  rotateRefreshToken,
+  setRefreshTokenCookie,
 } from '../utils/auth.utils';
 
 export const AuthController = {
+  async getUserById(req: Request, res: Response) {
+    try {
+      const { userId } = req.params as { userId: string };
+      if (!userId) {
+        res.status(400).json({ error: 'userId required' });
+        return;
+      }
+      const user = await AuthService.getUserPublic(userId);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error('Get user by id error:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch user' });
+    }
+  },
   async getAllUsers(req: Request, res: Response) {
     try {
       // Optionally, restrict to admin users only

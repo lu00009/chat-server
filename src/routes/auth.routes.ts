@@ -147,5 +147,6 @@ router.get('/presence/:userId', authenticate, PresenceController.user);
  *         description: Unauthorized
  */
 router.get('/users', authenticate, AuthController.getAllUsers);
+router.get('/users/:userId', authenticate, AuthController.getUserById);
 
 export default router;
