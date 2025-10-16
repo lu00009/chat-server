@@ -195,4 +195,25 @@ export const AuthController = {
       res.status(400).json({ error: error.message || 'Logout failed' });
     }
   },
+  async getNotificationSettings(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+      const prefs = await AuthService.getNotificationSettings(req.user.id);
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Get notification settings error:', error);
+      res.status(400).json({ error: error.message || 'Failed to load notification settings' });
+    }
+  },
+  async updateNotificationSettings(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+      const partial = req.body || {};
+      const updated = await AuthService.updateNotificationSettings(req.user.id, partial);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Update notification settings error:', error);
+      res.status(400).json({ error: error.message || 'Failed to update notification settings' });
+    }
+  },
 };

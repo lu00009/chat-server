@@ -149,4 +149,8 @@ router.get('/presence/:userId', authenticate, PresenceController.user);
 router.get('/users', authenticate, AuthController.getAllUsers);
 router.get('/users/:userId', authenticate, AuthController.getUserById);
 
+/** Notification settings */
+router.get('/notifications', authenticate, AuthController.getNotificationSettings);
+router.patch('/notifications', authenticate, AuthController.updateNotificationSettings);
+
 export default router;

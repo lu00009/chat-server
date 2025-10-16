@@ -24,6 +24,34 @@ export const AuthService = {
     });
     return user;
   },
+
+  async getNotificationSettings(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true } as any,
+    }) as any;
+    const defaults = {
+      messageNotifications: true,
+      groupInvites: true,
+      mentions: true,
+      reactions: true,
+      soundEnabled: true,
+      desktopNotifications: false,
+    };
+    const current = (user?.notificationSettings || {}) as Record<string, any>;
+    return { ...defaults, ...current };
+  },
+
+  async updateNotificationSettings(userId: string, partial: Record<string, any>) {
+    const current = await this.getNotificationSettings(userId);
+    const next = { ...current, ...partial };
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { notificationSettings: next } as any,
+      select: { notificationSettings: true } as any,
+    }) as any;
+    return updated.notificationSettings as Record<string, any>;
+  },
   async getAllUsers() {
     // Exclude sensitive fields
     const users = await prisma.user.findMany({

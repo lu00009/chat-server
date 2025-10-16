@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
+import fs from 'fs/promises';
 import prisma from '../prisma/prisma';
-import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
 import { getIO } from '../socket/io'; // Import the global getIO function
+import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
 // Import cloudinary in a way that works with both ESModule and CommonJS consumers
   const cloudinaryModule: any = require('../config/cloudinary');
   const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
-import fs from 'fs/promises';
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
 function normalizeMessageType(raw?: string) {
@@ -176,6 +176,17 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
       update: {},
       create: { userId, messageId, emoji },
     });
+
+    // Emit reaction event to group room for optional notifications
+    try {
+      const msg = await prisma.message.findUnique({ where: { id: messageId }, select: { id: true, groupId: true, senderId: true } });
+      const io = getIO();
+      if (io && msg?.groupId) {
+        io.to(msg.groupId).emit('reaction_added', { messageId, emoji, userId });
+      }
+    } catch (_) {
+      // non-blocking
+    }
 
     res.status(201).json(reaction);
   } catch (error:any) {

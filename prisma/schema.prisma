@@ -20,6 +20,7 @@ model User {
   status                  String?
   profilePicture          String?
   lastSeen                DateTime?
+  notificationSettings    Json         @default("{}")
   isVerified              Boolean       @default(false)
   verificationToken       String?       @unique
   verificationTokenExpiry DateTime?
