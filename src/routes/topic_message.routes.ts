@@ -3,6 +3,7 @@ import {
   sendMessageInTopic,
   getMessagesInTopic,
   deleteMessageInTopic,
+  deleteMessagesInTopicBulk,
 } from '../controllers/topic_message.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { upload } from '../middlewares/message/upload';
@@ -103,5 +104,41 @@ router.get('/:groupId/topics/:topicId/messages', getMessagesInTopic);
  *         description: Message deleted
  */
 router.delete('/:groupId/topics/:topicId/messages/:messageId', deleteMessageInTopic);
+
+/**
+ * @swagger
+ * /messages/{groupId}/topics/{topicId}/messages/bulk-delete:
+ *   post:
+ *     summary: Bulk delete messages in a topic
+ *     tags: [Topic Messages]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: topicId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Messages deleted
+ */
+router.post('/:groupId/topics/:topicId/messages/bulk-delete', deleteMessagesInTopicBulk);
 
 export default router;

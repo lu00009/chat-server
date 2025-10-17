@@ -28,6 +28,7 @@ model User {
   reactions               Reaction[]
   messagesSeen            MessageSeen[]
   refreshTokens           RefreshToken[]
+  hiddenMessages          MessageHidden[]
 }
 
 // Enum for user roles within a group
@@ -116,6 +117,7 @@ model Message {
   replies   Message[]     @relation("ReplyMessages")
   reactions Reaction[]
   seenBy    MessageSeen[]
+  hiddenBy  MessageHidden[]
 }
 
 // Reaction model for message reactions
@@ -156,5 +158,19 @@ model RefreshToken {
   ip              String?
   userAgent       String?
 
+  @@index([userId])
+}
+
+// Track per-user hidden messages (delete-for-me)
+model MessageHidden {
+  id        String   @id @default(uuid())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, messageId])
+  @@index([messageId])
   @@index([userId])
 }

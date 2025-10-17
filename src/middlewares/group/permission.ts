@@ -1,7 +1,7 @@
 import { RoleEnum } from '@prisma/client';
 import { NextFunction, Request, Response } from 'express';
 import prisma from '../../prisma/prisma';
-import type { } from '../../types/express'; // This is correct and necessary
+import type { } from '../../types/express';
 
 /**
  * Check if the current user is the group creator
@@ -17,6 +17,7 @@ export const CREATOR_PERMISSIONS = {
   manageMembers: true,
   managePermissions: true,
   manageTopics: true,
+  manageMessages: true, // allow deleting/moderating messages
 };
 
 // A regular member gets a limited set of permissions
@@ -29,7 +30,9 @@ export const DEFAULT_MEMBER_PERMISSIONS = {
   manageMembers: false,
   managePermissions: false,
   manageTopics: false,
+  manageMessages: false, // no moderation by default
 };
+
 export const isCreator = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { groupId } = req.params;
 
@@ -39,14 +42,12 @@ export const isCreator = async (req: Request, res: Response, next: NextFunction)
   }
   const userId = req.user.id;
 
-
   try {
     const group = await prisma.group.findUnique({ where: { id: groupId } });
     if (!group) {
       res.status(404).json({ error: 'Group not found' });
       return;
     }
-    // Corrected the property name from 'createdBy' to 'createdByUserId'
     if (group.createdByUserId !== userId) {
       res.status(403).json({ error: 'Only the creator can perform this action' });
       return;
@@ -71,7 +72,6 @@ export const hasPermission = (action: string) => {
       return;
     }
     const userId = req.user.id;
-
 
     try {
       const membership = await prisma.groupMember.findUnique({

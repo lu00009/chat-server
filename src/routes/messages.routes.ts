@@ -1,6 +1,8 @@
 import express from "express";
+import multer from 'multer';
 import {
     deleteMessage,
+    deleteMessagesBulk,
     getGroupMessages,
     markMessageSeen,
     reactToMessage,
@@ -12,6 +14,7 @@ import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { upload } from "../middlewares/message/upload";
 
 const router = express.Router();
+const uploadMulter = multer({ dest: 'uploads/' });
 
 // Require auth for all message endpoints
 router.use(authenticate);
@@ -115,6 +118,31 @@ router.patch("/:messageId", updateMessage);
  *         description: Message marked as deleted
  */
 router.delete("/:messageId", deleteMessage);
+
+/**
+ * @swagger
+ * /messages/bulk-delete:
+ *   post:
+ *     summary: Delete multiple messages
+ *     tags: [Messages]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               messageIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Messages deleted
+ */
+router.post("/bulk-delete", deleteMessagesBulk);
 
 /**
  * @swagger

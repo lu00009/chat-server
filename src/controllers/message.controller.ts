@@ -1,11 +1,24 @@
 import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
-import { getIO } from '../socket/io'; // Import the global getIO function
+import { getIO } from '../socket/io';
+import { RoleEnum } from '@prisma/client';
 // Import cloudinary in a way that works with both ESModule and CommonJS consumers
-  const cloudinaryModule: any = require('../config/cloudinary');
-  const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+const cloudinaryModule: any = require('../config/cloudinary');
+const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 import fs from 'fs/promises';
+
+// Helper to check moderation permission in a group
+async function canModerateMessages(userId: string, groupId: string): Promise<boolean> {
+  const membership = await prisma.groupMember.findUnique({
+    where: { userId_groupId: { userId, groupId } },
+    select: { role: true, permissions: true },
+  });
+  if (!membership) return false;
+  if (membership.role === RoleEnum.CREATOR || membership.role === RoleEnum.ADMIN) return true;
+  const perms = (membership.permissions as any) || {};
+  return !!perms.manageMessages; // custom permission flag in JSON
+}
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
 function normalizeMessageType(raw?: string) {
@@ -101,13 +114,17 @@ export const sendMessage = async (req: Request<{}, {}, SendMessageBody>, res: Re
   }
 };
 
-// Get messages in a group
+// Get messages in a group (exclude messages hidden by current user)
 export const getGroupMessages = async (req: Request, res: Response) => {
   const { groupId } = req.params;
+  const userId = (req as any).user?.id;
 
   try {
     const messages = await prisma.message.findMany({
-      where: { groupId },
+      where: {
+        groupId,
+        ...(userId ? { hiddenBy: { none: { userId } } } : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: {
         sender: true,
@@ -141,19 +158,167 @@ export const updateMessage = async (req: Request<{messageId: string}, {}, Update
   }
 };
 
-// Delete message
-export const deleteMessage = async (req: Request<{messageId: string}>, res: Response) => {
+// Delete message (for everyone or only me)
+export const deleteMessage = async (req: Request<{messageId: string}, {}, { scope?: 'me' | 'all' }>, res: Response) => {
   const { messageId } = req.params;
+  const scope = (req.query.scope as string) || (req.body?.scope as any) || 'all';
+  const userId = (req as any).user?.id;
 
   try {
-    const message = await prisma.message.delete({
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const existing = await prisma.message.findUnique({
       where: { id: messageId },
+      select: { id: true, senderId: true, groupId: true, mediaPublicId: true, mediaResourceType: true }
     });
 
-    res.json({ message: "Deleted successfully" });
+    if (!existing) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    if (scope === 'me') {
+      // Hide for this user only
+      await prisma.messageHidden.create({
+        data: { userId, messageId: existing.id },
+      }).catch(() => {});
+      res.json({ message: 'Hidden for you' });
+      return;
+    }
+
+    // Allow sender, admins/creator or users with manageMessages permission
+    const isOwner = existing.senderId === userId;
+    const allowed = isOwner || await canModerateMessages(userId, existing.groupId);
+    if (!allowed) {
+      res.status(403).json({ error: 'You do not have permission to delete this message' });
+      return;
+    }
+
+    // Best-effort delete on Cloudinary
+    if (existing.mediaPublicId) {
+      try {
+        const rt = existing.mediaResourceType === 'image' || existing.mediaResourceType === 'video' ? existing.mediaResourceType : 'raw';
+        await cloudinaryUploader.destroy(existing.mediaPublicId, { resource_type: rt });
+      } catch (e) {
+        console.warn('Cloudinary destroy failed:', (e as any)?.message || e);
+      }
+    }
+
+    // Delete dependent rows first, then the message (transaction)
+    await prisma.$transaction([
+      prisma.reaction.deleteMany({ where: { messageId: existing.id } }),
+      prisma.messageSeen.deleteMany({ where: { messageId: existing.id } }),
+      prisma.messageHidden.deleteMany({ where: { messageId: existing.id } }),
+      prisma.message.delete({ where: { id: existing.id } }),
+    ]);
+
+    // Emit deletion event to everyone
+    const io = getIO();
+    if (io) io.to(existing.groupId).emit('message_deleted', { messageId: existing.id });
+
+    res.json({ message: 'Deleted for everyone' });
   } catch (error:any) {
     console.error('deleteMessage error:', error);
-    res.status(500).json({ error: "Failed to delete message", details: error.message });
+    res.status(500).json({ error: 'Failed to delete message', details: error.message });
+  }
+};
+
+// Bulk delete messages (and files) with scope
+export const deleteMessagesBulk = async (req: Request<{}, {}, { ids: string[]; scope?: 'me' | 'all' }>, res: Response) => {
+  const { ids, scope = 'all' } = (req.body || {}) as any;
+  const userId = (req as any).user?.id;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: 'ids array is required' });
+    return;
+  }
+
+  try {
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const messages = await prisma.message.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, senderId: true, groupId: true, mediaPublicId: true, mediaResourceType: true }
+    });
+
+    if (messages.length === 0) {
+      res.json({ deleted: 0, ids: [] });
+      return;
+    }
+
+    if (scope === 'me') {
+      await prisma.messageHidden.createMany({
+        data: messages.map(m => ({ userId, messageId: m.id })),
+        skipDuplicates: true,
+      });
+      res.json({ hidden: messages.length, ids: messages.map(m => m.id) });
+      return;
+    }
+
+    // Compute which groups the user can moderate
+    const uniqueGroupIds = Array.from(new Set(messages.map(m => m.groupId)));
+    const memberships = await prisma.groupMember.findMany({
+      where: { userId, groupId: { in: uniqueGroupIds } },
+      select: { groupId: true, role: true, permissions: true },
+    });
+    const moderatableGroups = new Set(
+      memberships
+        .filter(m => m.role === RoleEnum.CREATOR || m.role === RoleEnum.ADMIN || (m.permissions as any)?.manageMessages)
+        .map(m => m.groupId)
+    );
+
+    // Allow delete if owner or can moderate the group
+    const deletable = messages.filter(m => m.senderId === userId || moderatableGroups.has(m.groupId));
+
+    // Delete files first (best-effort)
+    for (const m of deletable) {
+      if (m.mediaPublicId) {
+        try {
+          const rt = m.mediaResourceType === 'image' || m.mediaResourceType === 'video' ? m.mediaResourceType : 'raw';
+          await cloudinaryUploader.destroy(m.mediaPublicId, { resource_type: rt });
+        } catch (e) {
+          console.warn('Cloudinary destroy failed:', (e as any)?.message || e);
+        }
+      }
+    }
+
+    const deleteIds = deletable.map(m => m.id);
+    if (deleteIds.length === 0) {
+      res.status(403).json({ error: 'No deletable messages for your permission' });
+      return;
+    }
+
+    // Delete dependent rows first, then the messages (transaction)
+    await prisma.$transaction([
+      prisma.reaction.deleteMany({ where: { messageId: { in: deleteIds } } }),
+      prisma.messageSeen.deleteMany({ where: { messageId: { in: deleteIds } } }),
+      prisma.messageHidden.deleteMany({ where: { messageId: { in: deleteIds } } }),
+      prisma.message.deleteMany({ where: { id: { in: deleteIds } } }),
+    ]);
+
+    // Emit deletions per group (group by groupId)
+    const io = getIO();
+    if (io) {
+      const byGroup = deletable.reduce<Record<string, string[]>>((acc, m) => {
+        acc[m.groupId] = acc[m.groupId] || [];
+        acc[m.groupId].push(m.id);
+        return acc;
+      }, {} as Record<string, string[]>);
+      for (const [groupId, mids] of Object.entries(byGroup)) {
+        io.to(groupId).emit('messages_deleted', { ids: mids });
+      }
+    }
+
+    res.json({ deleted: deleteIds.length, ids: deleteIds });
+  } catch (error:any) {
+    console.error('deleteMessagesBulk error:', error);
+    res.status(500).json({ error: 'Failed to bulk delete messages', details: error.message });
   }
 };
 
@@ -169,6 +334,7 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
       res.status(400).json({ error: 'Missing userId' });
       return;
     }
+
     const reaction = await prisma.reaction.upsert({
       where: {
         userId_messageId_emoji: { userId, messageId, emoji },
@@ -176,6 +342,24 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
       update: {},
       create: { userId, messageId, emoji },
     });
+
+    // Fetch updated reactions and message scope for socket emission
+    const [reactions, msg] = await Promise.all([
+      prisma.reaction.findMany({
+        where: { messageId },
+        select: { userId: true, emoji: true },
+      }),
+      prisma.message.findUnique({
+        where: { id: messageId },
+        select: { groupId: true, topicId: true },
+      }),
+    ]);
+
+    const io = getIO();
+    if (io && msg) {
+      if (msg.topicId) io.to(msg.topicId).emit('reaction_updated', { messageId, reactions });
+      io.to(msg.groupId).emit('reaction_updated', { messageId, reactions });
+    }
 
     res.status(201).json(reaction);
   } catch (error:any) {
@@ -195,6 +379,24 @@ export const removeReaction = async (req: Request<{messageId: string, emoji: str
         userId_messageId_emoji: { userId, messageId, emoji },
       },
     });
+
+    // Fetch updated reactions and message scope for socket emission
+    const [reactions, msg] = await Promise.all([
+      prisma.reaction.findMany({
+        where: { messageId },
+        select: { userId: true, emoji: true },
+      }),
+      prisma.message.findUnique({
+        where: { id: messageId },
+        select: { groupId: true, topicId: true },
+      }),
+    ]);
+
+    const io = getIO();
+    if (io && msg) {
+      if (msg.topicId) io.to(msg.topicId).emit('reaction_updated', { messageId, reactions });
+      io.to(msg.groupId).emit('reaction_updated', { messageId, reactions });
+    }
 
     res.json({ message: "Reaction removed" });
   } catch (error:any) {
