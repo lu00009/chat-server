@@ -1,15 +1,33 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.services';
 import {
-    clearRefreshTokenCookie,
-    createRefreshToken,
-    generateToken,
-    revokeRefreshToken,
-    rotateRefreshToken,
-    setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+  createRefreshToken,
+  generateToken,
+  revokeRefreshToken,
+  rotateRefreshToken,
+  setRefreshTokenCookie,
 } from '../utils/auth.utils';
 
 export const AuthController = {
+  async getUserById(req: Request, res: Response) {
+    try {
+      const { userId } = req.params as { userId: string };
+      if (!userId) {
+        res.status(400).json({ error: 'userId required' });
+        return;
+      }
+      const user = await AuthService.getUserPublic(userId);
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error('Get user by id error:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch user' });
+    }
+  },
   async getAllUsers(req: Request, res: Response) {
     try {
       // Optionally, restrict to admin users only
@@ -91,6 +109,32 @@ export const AuthController = {
       });
     }
   },
+  
+  async updateProfile(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const { name, bio, status, profilePicture } = req.body as {
+        name?: string;
+        bio?: string;
+        status?: string;
+        profilePicture?: string;
+      };
+
+      const updated = await AuthService.updateProfile(req.user.id, {
+        name,
+        bio,
+        status,
+        profilePicture,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      res.status(400).json({ error: error.message || 'Failed to update profile' });
+    }
+  },
   async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.body;
@@ -149,6 +193,27 @@ export const AuthController = {
     } catch (error: any) {
       console.error('Logout error:', error);
       res.status(400).json({ error: error.message || 'Logout failed' });
+    }
+  },
+  async getNotificationSettings(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+      const prefs = await AuthService.getNotificationSettings(req.user.id);
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Get notification settings error:', error);
+      res.status(400).json({ error: error.message || 'Failed to load notification settings' });
+    }
+  },
+  async updateNotificationSettings(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+      const partial = req.body || {};
+      const updated = await AuthService.updateNotificationSettings(req.user.id, partial);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Update notification settings error:', error);
+      res.status(400).json({ error: error.message || 'Failed to update notification settings' });
     }
   },
 };

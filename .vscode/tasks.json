@@ -1,0 +1,30 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "prisma-migrate-and-generate",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"-s",
+				"prisma:migrate"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Prisma migrate dev",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"-s",
+				"prisma:migrate"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

@@ -6,6 +6,52 @@ import { sendVerificationEmail } from '../utils/mail';
 const SALT_ROUNDS = 12;
 
 export const AuthService = {
+  async getUserPublic(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        bio: true,
+        profilePicture: true,
+        status: true,
+        lastSeen: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return user;
+  },
+
+  async getNotificationSettings(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true } as any,
+    }) as any;
+    const defaults = {
+      messageNotifications: true,
+      groupInvites: true,
+      mentions: true,
+      reactions: true,
+      soundEnabled: true,
+      desktopNotifications: false,
+    };
+    const current = (user?.notificationSettings || {}) as Record<string, any>;
+    return { ...defaults, ...current };
+  },
+
+  async updateNotificationSettings(userId: string, partial: Record<string, any>) {
+    const current = await this.getNotificationSettings(userId);
+    const next = { ...current, ...partial };
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { notificationSettings: next } as any,
+      select: { notificationSettings: true } as any,
+    }) as any;
+    return updated.notificationSettings as Record<string, any>;
+  },
   async getAllUsers() {
     // Exclude sensitive fields
     const users = await prisma.user.findMany({
@@ -13,6 +59,9 @@ export const AuthService = {
         id: true,
         name: true,
         email: true,
+        profilePicture: true,
+        status: true,
+        lastSeen: true,
         createdAt: true,
         updatedAt: true,
         isVerified: true,
@@ -219,15 +268,18 @@ export const AuthService = {
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
+      select: ({
         id: true,
         email: true,
         name: true,
+        bio: true,
+        status: true,
+        profilePicture: true,
+        lastSeen: true,
         isVerified: true,
         createdAt: true,
         updatedAt: true,
-        // Include other relevant fields but exclude sensitive data
-      }
+      } as any)
     });
 
     if (!user) {
@@ -235,5 +287,38 @@ export const AuthService = {
     }
 
     return user;
+  },
+
+  async updateProfile(userId: string, data: {
+    name?: string;
+    bio?: string;
+    status?: string;
+    profilePicture?: string;
+  }) {
+    // Sanitize input: trim strings and ignore empty values
+    const updates: any = {};
+    if (typeof data.name === 'string') updates.name = data.name.trim();
+    if (typeof data.bio === 'string') updates.bio = data.bio.trim();
+    if (typeof data.status === 'string') updates.status = data.status.trim();
+    if (typeof data.profilePicture === 'string') updates.profilePicture = data.profilePicture.trim();
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      // Cast to any to allow schema-evolution fields until prisma generate runs
+      data: updates as any,
+      select: ({
+        id: true,
+        email: true,
+        name: true,
+        bio: true,
+        status: true,
+        profilePicture: true,
+        lastSeen: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      } as any)
+    });
+    return updated;
   }
 };

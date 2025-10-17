@@ -1,24 +1,13 @@
 import { Request, Response } from "express";
-import prisma from '../prisma/prisma';
-import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
-import { getIO } from '../socket/io';
-import { RoleEnum } from '@prisma/client';
-// Import cloudinary in a way that works with both ESModule and CommonJS consumers
-const cloudinaryModule: any = require('../config/cloudinary');
-const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 import fs from 'fs/promises';
-
-// Helper to check moderation permission in a group
-async function canModerateMessages(userId: string, groupId: string): Promise<boolean> {
-  const membership = await prisma.groupMember.findUnique({
-    where: { userId_groupId: { userId, groupId } },
-    select: { role: true, permissions: true },
-  });
-  if (!membership) return false;
-  if (membership.role === RoleEnum.CREATOR || membership.role === RoleEnum.ADMIN) return true;
-  const perms = (membership.permissions as any) || {};
-  return !!perms.manageMessages; // custom permission flag in JSON
-}
+import prisma from '../prisma/prisma';
+import { getIO } from '../socket/io'; // Import the global getIO function
+import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
+import { getIO } from '../socket/io'; // Import the global getIO function
+// Import cloudinary in a way that works with both ESModule and CommonJS consumers
+  const cloudinaryModule: any = require('../config/cloudinary');
+  const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+import fs from 'fs/promises';
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
 function normalizeMessageType(raw?: string) {
@@ -342,24 +331,6 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
       update: {},
       create: { userId, messageId, emoji },
     });
-
-    // Fetch updated reactions and message scope for socket emission
-    const [reactions, msg] = await Promise.all([
-      prisma.reaction.findMany({
-        where: { messageId },
-        select: { userId: true, emoji: true },
-      }),
-      prisma.message.findUnique({
-        where: { id: messageId },
-        select: { groupId: true, topicId: true },
-      }),
-    ]);
-
-    const io = getIO();
-    if (io && msg) {
-      if (msg.topicId) io.to(msg.topicId).emit('reaction_updated', { messageId, reactions });
-      io.to(msg.groupId).emit('reaction_updated', { messageId, reactions });
-    }
 
     res.status(201).json(reaction);
   } catch (error:any) {

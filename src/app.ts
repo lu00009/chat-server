@@ -9,6 +9,7 @@ import memberRoutes from './routes/member.routes';
 import topicRoutes from './routes/topic.routes';
 import topicMessageRoutes from './routes/topic_message.routes';
 
+import path from 'path';
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from 'swagger-ui-express';
 import { env } from './env';
@@ -31,6 +32,9 @@ app.use('/group', groupRoutes);
 app.use('/group', memberRoutes);
 app.use('/group', topicRoutes);
 app.use('/messages', topicMessageRoutes);
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
 
 app.post("/upload", upload.single('file'), (req, res) => {
   res.json({ message: 'File uploaded successfully', file: req.file });
