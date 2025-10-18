@@ -216,4 +216,45 @@ export const AuthController = {
       res.status(400).json({ error: error.message || 'Failed to update notification settings' });
     }
   },
+
+  // New: upload and set profile picture using Cloudinary
+  async uploadProfilePicture(req: Request, res: Response) {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded. Use field name "profilePicture".' });
+        return;
+      }
+
+      // Import cloudinary similar to other controllers for compatibility
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const cloudinaryModule: any = require('../config/cloudinary');
+      const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+
+      // Upload to Cloudinary
+      const result = await cloudinaryUploader.upload(req.file.path, {
+        resource_type: 'image',
+        folder: 'profile_pictures',
+        overwrite: true,
+      });
+
+      // Remove local temp file best-effort
+      try { (await import('fs/promises')).unlink(req.file.path).catch(() => {}); } catch {}
+
+      const updated = await AuthService.updateProfile(req.user.id, {
+        profilePicture: result.secure_url,
+      });
+
+      res.json({
+        message: 'Profile picture updated',
+        user: updated,
+      });
+    } catch (error: any) {
+      console.error('Upload profile picture error:', error);
+      res.status(400).json({ error: error.message || 'Failed to upload profile picture' });
+    }
+  },
 };

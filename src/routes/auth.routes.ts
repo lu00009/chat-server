@@ -1,9 +1,9 @@
-
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { PresenceController } from '../controllers/presence.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { validatePassword } from '../middlewares/auth/validatePassword.middleware';
+import { upload } from '../middlewares/message/upload';
 
 const router = Router();
 
@@ -116,6 +116,34 @@ router.get('/profile', authenticate, AuthController.profile);
  *         description: Unauthorized
  */
 router.patch('/profile', authenticate, AuthController.updateProfile);
+
+/**
+ * @swagger
+ * /auth/profile/picture:
+ *   post:
+ *     summary: Upload and set the authenticated user's profile picture
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               profilePicture:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Profile picture uploaded and updated
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/profile/picture', authenticate, upload.single('profilePicture'), AuthController.uploadProfilePicture);
 
 /**
  * @swagger

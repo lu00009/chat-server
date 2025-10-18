@@ -5,10 +5,7 @@ import app from './app';
 import { env } from './env';
 import prisma from './prisma/prisma';
 import { updateUserLastSeen } from './services/presence.service';
-<<<<<<< HEAD
-=======
 import { setIO } from './socket/io';
->>>>>>> 9e8f67e81662c34903f4c9c61fbed96de6f89207
 import { userConnected, userDisconnected } from './socket/presence';
 import { verifyToken } from './utils/auth.utils';
 // Cloudinary uploader for media cleanup on delete
@@ -19,8 +16,8 @@ const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: [env.FRONTEND_URL, env.CLIENT_URL],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    origin: "*",
+    methods: ["GET", "POST"],
     credentials: true
   },
   path: env.SOCKET_PATH,
