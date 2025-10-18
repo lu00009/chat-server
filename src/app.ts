@@ -21,6 +21,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
+  origin: env.FRONTEND_URL,
   credentials: true,
 }));
 
@@ -34,7 +35,10 @@ app.use('/group', topicRoutes);
 app.use('/messages', topicMessageRoutes);
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
+// Align the static serve directory with Multer's storage path (see middlewares/message/upload.ts)
+// upload.ts stores files at projectRoot/uploads (../../../ from its location),
+// so from here (src/app.ts) we also need to serve from projectRoot/uploads which is two levels up from dist/app.js
+app.use('/uploads', express.static(path.resolve(__dirname, '../../uploads')));
 
 app.post("/upload", upload.single('file'), (req, res) => {
   res.json({ message: 'File uploaded successfully', file: req.file });

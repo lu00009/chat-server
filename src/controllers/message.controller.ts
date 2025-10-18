@@ -1,13 +1,12 @@
+import { RoleEnum } from '@prisma/client';
 import { Request, Response } from "express";
 import fs from 'fs/promises';
 import prisma from '../prisma/prisma';
 import { getIO } from '../socket/io'; // Import the global getIO function
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
-import { getIO } from '../socket/io'; // Import the global getIO function
 // Import cloudinary in a way that works with both ESModule and CommonJS consumers
-  const cloudinaryModule: any = require('../config/cloudinary');
-  const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
-import fs from 'fs/promises';
+const cloudinaryModule: any = require('../config/cloudinary');
+const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 
 // Helper to normalize message type input (frontend sends lowercase like 'text')
 function normalizeMessageType(raw?: string) {
@@ -15,6 +14,18 @@ function normalizeMessageType(raw?: string) {
   const upper = raw.toUpperCase();
   const allowed = ['TEXT','IMAGE','FILE','VIDEO'];
   return allowed.includes(upper) ? upper : 'TEXT';
+}
+
+// Helper: can the user moderate messages in a group?
+async function canModerateMessages(userId: string, groupId: string): Promise<boolean> {
+  const membership = await prisma.groupMember.findUnique({
+    where: { userId_groupId: { userId, groupId } },
+    select: { role: true, permissions: true },
+  });
+  if (!membership) return false;
+  if (membership.role === RoleEnum.CREATOR || membership.role === RoleEnum.ADMIN) return true;
+  const perms = (membership.permissions as any) || {};
+  return !!perms.manageMessages;
 }
 
 // Send a new message
