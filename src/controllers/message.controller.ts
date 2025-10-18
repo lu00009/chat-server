@@ -1,3 +1,4 @@
+import { RoleEnum } from '@prisma/client';
 import { Request, Response } from "express";
 import prisma from '../prisma/prisma';
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
@@ -26,6 +27,18 @@ function normalizeMessageType(raw?: string) {
   const upper = raw.toUpperCase();
   const allowed = ['TEXT', 'IMAGE', 'FILE', 'VIDEO'];
   return allowed.includes(upper) ? upper : 'TEXT';
+}
+
+// Helper: can the user moderate messages in a group?
+async function canModerateMessages(userId: string, groupId: string): Promise<boolean> {
+  const membership = await prisma.groupMember.findUnique({
+    where: { userId_groupId: { userId, groupId } },
+    select: { role: true, permissions: true },
+  });
+  if (!membership) return false;
+  if (membership.role === RoleEnum.CREATOR || membership.role === RoleEnum.ADMIN) return true;
+  const perms = (membership.permissions as any) || {};
+  return !!perms.manageMessages;
 }
 
 // Send a new message

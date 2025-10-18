@@ -1,13 +1,13 @@
 import express from 'express';
 import {
-  createGroup,
-  deleteGroup,
-  getGroupById,
-  getGroups,
-  getPublicGroups,
-  joinGroup,
-  leaveGroup,
-  updateGroupById,
+    createGroup,
+    deleteGroup,
+    getGroupById,
+    getGroups,
+    getPublicGroups,
+    joinGroup,
+    leaveGroup,
+    updateGroupById,
 } from '../controllers/group.controller';
 import { authenticate } from '../middlewares/auth/authenticate.middleware';
 import { isCreator } from '../middlewares/group/permission';
@@ -181,6 +181,7 @@ router.get('/:groupId', getGroupById);
  *       404:
  *         description: Group not found
  */
-router.patch('/:groupId', isCreator, upload.single("file"), updateGroupById);
+// Accept group picture uploads using the 'groupPicture' field to match frontend
+router.patch('/:groupId', isCreator, upload.single("groupPicture"), updateGroupById);
 
 export default router;

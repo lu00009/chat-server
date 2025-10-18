@@ -1,13 +1,16 @@
+import { RoleEnum } from '@prisma/client';
 import * as http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import app from './app';
 import { env } from './env';
 import prisma from './prisma/prisma';
 import { updateUserLastSeen } from './services/presence.service';
+<<<<<<< HEAD
+=======
+import { setIO } from './socket/io';
+>>>>>>> 9e8f67e81662c34903f4c9c61fbed96de6f89207
 import { userConnected, userDisconnected } from './socket/presence';
 import { verifyToken } from './utils/auth.utils';
-import { setIO } from './socket/io';
-import { RoleEnum } from '@prisma/client';
 // Cloudinary uploader for media cleanup on delete
 const cloudinaryModule: any = require('./config/cloudinary');
 const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
