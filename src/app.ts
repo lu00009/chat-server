@@ -20,9 +20,18 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3002"];
 app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 }));
+
 
 const specs = swaggerJsdoc(swaggerOptions);
 app.use(env.SWAGGER_PATH, swaggerUi.serve, swaggerUi.setup(specs));

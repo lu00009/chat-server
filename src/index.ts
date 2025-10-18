@@ -4,7 +4,6 @@ import app from './app';
 import { env } from './env';
 import prisma from './prisma/prisma';
 import { updateUserLastSeen } from './services/presence.service';
-import { setIO } from './socket/io'; // <-- added
 import { userConnected, userDisconnected } from './socket/presence';
 import { verifyToken } from './utils/auth.utils';
 import { setIO } from './socket/io';
@@ -17,8 +16,8 @@ const server = http.createServer(app);
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
+    origin: [env.FRONTEND_URL, env.CLIENT_URL],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true
   },
   path: env.SOCKET_PATH,

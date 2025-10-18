@@ -1,19 +1,30 @@
 import { Request, Response } from "express";
-import fs from 'fs/promises';
 import prisma from '../prisma/prisma';
-import { getIO } from '../socket/io'; // Import the global getIO function
 import { ReactionBody, SeenBody, SendMessageBody, UpdateMessageBody } from '../types/chats';
-import { getIO } from '../socket/io'; // Import the global getIO function
+import { getIO } from '../socket/io';
+import { RoleEnum } from '@prisma/client';
 // Import cloudinary in a way that works with both ESModule and CommonJS consumers
-  const cloudinaryModule: any = require('../config/cloudinary');
-  const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+const cloudinaryModule: any = require('../config/cloudinary');
+const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
 import fs from 'fs/promises';
 
-// Helper to normalize message type input (frontend sends lowercase like 'text')
+// Helper: can the user moderate messages in a group?
+async function canModerateMessages(userId: string, groupId: string): Promise<boolean> {
+  const membership = await prisma.groupMember.findUnique({
+    where: { userId_groupId: { userId, groupId } },
+    select: { role: true, permissions: true },
+  });
+  if (!membership) return false;
+  if (membership.role === RoleEnum.CREATOR || membership.role === RoleEnum.ADMIN) return true;
+  const perms = (membership.permissions as any) || {};
+  return !!perms.manageMessages;
+}
+
+// Normalize message type sent from client
 function normalizeMessageType(raw?: string) {
   if (!raw) return 'TEXT';
   const upper = raw.toUpperCase();
-  const allowed = ['TEXT','IMAGE','FILE','VIDEO'];
+  const allowed = ['TEXT', 'IMAGE', 'FILE', 'VIDEO'];
   return allowed.includes(upper) ? upper : 'TEXT';
 }
 
@@ -311,7 +322,7 @@ export const deleteMessagesBulk = async (req: Request<{}, {}, { ids: string[]; s
   }
 };
 
-// React to message
+// React to message (emit socket reaction_updated)
 export const reactToMessage = async (req: Request<{messageId: string}, {}, ReactionBody>, res: Response) => {
   const { messageId } = req.params;
   const { userId: bodyUserId, emoji } = req.body;
@@ -331,6 +342,24 @@ export const reactToMessage = async (req: Request<{messageId: string}, {}, React
       update: {},
       create: { userId, messageId, emoji },
     });
+
+    // Fetch updated reactions and message scope for socket emission
+    const [reactions, msg] = await Promise.all([
+      prisma.reaction.findMany({
+        where: { messageId },
+        select: { userId: true, emoji: true },
+      }),
+      prisma.message.findUnique({
+        where: { id: messageId },
+        select: { groupId: true, topicId: true },
+      }),
+    ]);
+
+    const io = getIO();
+    if (io && msg) {
+      if (msg.topicId) io.to(msg.topicId).emit('reaction_updated', { messageId, reactions });
+      io.to(msg.groupId).emit('reaction_updated', { messageId, reactions });
+    }
 
     res.status(201).json(reaction);
   } catch (error:any) {
