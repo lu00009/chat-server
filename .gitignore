@@ -18,3 +18,5 @@ build/
 Thumbs.db
 /src/generated/prisma
 /src/uploads
+# Ignore the canonical uploads directory at the project root
+/uploads

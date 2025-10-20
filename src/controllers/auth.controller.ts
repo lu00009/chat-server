@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import path from 'path';
 import { AuthService } from '../services/auth.services';
 import {
   clearRefreshTokenCookie,
@@ -229,28 +230,39 @@ export const AuthController = {
         return;
       }
 
-      // Import cloudinary similar to other controllers for compatibility
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const cloudinaryModule: any = require('../config/cloudinary');
-      const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+      // Try Cloudinary first; fall back to local /uploads URL if unavailable
+      let profileUrl: string | null = null;
+      try {
+        // Import cloudinary similar to other controllers for compatibility
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const cloudinaryModule: any = require('../config/cloudinary');
+        const cloudinaryUploader = cloudinaryModule.uploader || cloudinaryModule.default?.uploader;
+        if (cloudinaryUploader) {
+          const result = await cloudinaryUploader.upload(req.file.path, {
+            resource_type: 'image',
+            folder: 'profile_pictures',
+            overwrite: true,
+          });
+          profileUrl = result?.secure_url || result?.url || null;
+          // Remove local temp file best-effort
+          try { (await import('fs/promises')).unlink(req.file.path).catch(() => {}); } catch {}
+        }
+      } catch (e) {
+        console.warn('Cloudinary upload failed or unavailable, falling back to local uploads:', e);
+      }
 
-      // Upload to Cloudinary
-      const result = await cloudinaryUploader.upload(req.file.path, {
-        resource_type: 'image',
-        folder: 'profile_pictures',
-        overwrite: true,
-      });
+      if (!profileUrl) {
+        const fileName = path.basename(req.file.path);
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        profileUrl = `${baseUrl}/uploads/${fileName}`;
+      }
 
-      // Remove local temp file best-effort
-      try { (await import('fs/promises')).unlink(req.file.path).catch(() => {}); } catch {}
-
-      const updated = await AuthService.updateProfile(req.user.id, {
-        profilePicture: result.secure_url,
-      });
+      const updated = await AuthService.updateProfile(req.user.id, { profilePicture: profileUrl });
 
       res.json({
         message: 'Profile picture updated',
         user: updated,
+        profilePicture: updated.profilePicture,
       });
     } catch (error: any) {
       console.error('Upload profile picture error:', error);

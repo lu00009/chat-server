@@ -37,10 +37,11 @@ app.use('/group', topicRoutes);
 app.use('/messages', topicMessageRoutes);
 
 // Serve uploaded files
-// Align the static serve directory with Multer's storage path (see middlewares/message/upload.ts)
-// upload.ts stores files at projectRoot/uploads (../../../ from its location),
-// so from here (src/app.ts) we also need to serve from projectRoot/uploads which is two levels up from dist/app.js
-app.use('/uploads', express.static(path.resolve(__dirname, '../../uploads')));
+// Always serve from the canonical project-root uploads directory in both dev (src) and prod (dist).
+// Using "../uploads" resolves to <project>/chat-server/uploads from:
+//  - dev (__dirname = <project>/chat-server/src)
+//  - prod (__dirname = <project>/chat-server/dist)
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 app.post("/upload", upload.single('file'), (req, res) => {
   res.json({ message: 'File uploaded successfully', file: req.file });
